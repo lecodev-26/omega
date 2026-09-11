@@ -5,15 +5,6 @@ static omega_exception_info_t g_last_info;
 
 extern void exceptions_install(void);
 
-static void uart_puthex64(uint64_t v) {
-    uart_puts("0x");
-    for (int i = 60; i >= 0; i -= 4) {
-        uint32_t nib = (uint32_t)((v >> i) & 0xF);
-        char c = (nib < 10) ? (char)('0' + nib) : (char)('a' + nib - 10);
-        uart_putc(c);
-    }
-}
-
 void exceptions_init(void) {
     g_last_info.class = OMEGA_EXC_NONE;
     g_last_info.esr_el1 = 0;

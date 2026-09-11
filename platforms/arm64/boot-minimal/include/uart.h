@@ -10,21 +10,26 @@
 
 #define UART0_BASE  0x09000000
 
-#define UART_DR     (UART0_BASE + 0x00)  /* Data Register */
-#define UART_FR     (UART0_BASE + 0x18)  /* Flag Register */
+#define UART_DR     (UART0_BASE + 0x00)
+#define UART_FR     (UART0_BASE + 0x18)
 
-/* Flags del registro FR */
-#define UART_FR_TXFF (1 << 5)  /* TX FIFO full */
-#define UART_FR_RXFE (1 << 4)  /* RX FIFO empty */
+#define UART_FR_TXFF (1 << 5)
+#define UART_FR_RXFE (1 << 4)
 
 void uart_init(void);
 void uart_putc(char c);
 void uart_puts(const char *s);
+char uart_getc(void);
 
 /*
- * Lee un carácter del UART (blocking).
- * No usa interrupciones; hace polling hasta que llega un byte.
+ * Imprime un número en decimal.
  */
-char uart_getc(void);
+void uart_putdec64(uint64_t v);
+void uart_putdec32(uint32_t v);
+
+/*
+ * Imprime un número en hexadecimal (64 bits).
+ */
+void uart_puthex64(uint64_t v);
 
 #endif /* OMEGA_BOOT_UART_H */

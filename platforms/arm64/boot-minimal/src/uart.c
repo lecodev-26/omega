@@ -36,3 +36,35 @@ char uart_getc(void) {
     }
     return (char)(mmio_read(UART_DR) & 0xFF);
 }
+
+void uart_putdec64(uint64_t v) {
+    char buf[21];  /* 20 dígitos max para 2^64 */
+    int i = 0;
+
+    if (v == 0) {
+        uart_putc('0');
+        return;
+    }
+
+    while (v > 0 && i < (int)sizeof(buf)) {
+        buf[i++] = (char)('0' + (v % 10));
+        v /= 10;
+    }
+
+    while (i > 0) {
+        uart_putc(buf[--i]);
+    }
+}
+
+void uart_putdec32(uint32_t v) {
+    uart_putdec64((uint64_t)v);
+}
+
+void uart_puthex64(uint64_t v) {
+    uart_puts("0x");
+    for (int i = 60; i >= 0; i -= 4) {
+        uint32_t nib = (uint32_t)((v >> i) & 0xF);
+        char c = (nib < 10) ? (char)('0' + nib) : (char)('a' + nib - 10);
+        uart_putc(c);
+    }
+}

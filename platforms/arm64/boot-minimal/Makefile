@@ -5,7 +5,6 @@ LD      := ld.lld
 OBJCOPY := llvm-objcopy
 
 TARGET  := aarch64-unknown-none
-# -mgeneral-regs-only: prohibido usar FP/SIMD (no estan habilitados por defecto)
 CFLAGS  := --target=$(TARGET) -std=c11 -Wall -Wextra -O2 -ffreestanding \
            -fno-stack-protector -mgeneral-regs-only -Iinclude
 LDFLAGS := -T linker.ld
@@ -14,7 +13,7 @@ SRC_DIR   := src
 BUILD_DIR := build
 
 ASM_SRCS := boot.S exceptions_asm.S
-C_SRCS   := kmain.c uart.c exceptions.c
+C_SRCS   := kmain.c uart.c exceptions.c timer.c
 
 ASM_OBJS := $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
 C_OBJS   := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS))
