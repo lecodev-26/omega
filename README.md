@@ -11,10 +11,24 @@ para construir un sistema operativo de nueva generación.
 
 **No existe todavía:**
 
+- Kernel funcional
+- Sistema operativo ejecutable
+- Imagen arrancable
+- Benchmark ejecutado
+- Resultados experimentales
+
 ## Visión
 
 OMEGA investiga una arquitectura propia basada en:
 
+- Microkernel
+- Capabilities
+- Aislamiento fuerte
+- Servicios en user space
+- IPC explícito
+- Composición modular
+- Verificabilidad
+- Portabilidad
 
 Esta arquitectura **no se considera demostrada ni definitiva**. Las decisiones
 futuras pueden cambiar si la evidencia experimental o técnica lo exige.
