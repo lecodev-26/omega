@@ -13,7 +13,7 @@ SRC_DIR   := src
 BUILD_DIR := build
 
 ASM_SRCS := boot.S exceptions_asm.S
-C_SRCS   := kmain.c uart.c exceptions.c timer.c
+C_SRCS   := kmain.c uart.c exceptions.c timer.c gic.c
 
 ASM_OBJS := $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
 C_OBJS   := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS))
