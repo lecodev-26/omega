@@ -1,0 +1,16 @@
+LICENSE — PENDIENTE DE DECISIÓN
+
+OMEGA todavía no ha decidido su licencia definitiva.
+
+Este archivo existe como placeholder para evitar ambigüedad.
+
+La decisión de licencia se tomará en una fase posterior y quedará documentada
+como ADR en docs/decisions/.
+
+Mientras tanto:
+- No se concede licencia implícita de uso comercial.
+- No se concede licencia implícita de redistribución.
+- El código y la documentación son públicos únicamente con fines de
+  investigación y revisión.
+
+Para más información, ver docs/decisions/.

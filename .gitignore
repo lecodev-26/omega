@@ -1,0 +1,23 @@
+# Build artifacts
+build/
+out/
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.img
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Termux / local
+*.log
+tmp/
