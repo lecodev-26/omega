@@ -1,6 +1,6 @@
 /*
  * OMEGA — Host prototype
- * service.h — Servicio conceptual
+ * service.h — Servicio conceptual (v2)
  *
  * Un servicio es una unidad que:
  *   - recibe mensajes en un endpoint
@@ -18,10 +18,8 @@
 #include "message.h"
 #include "endpoint.h"
 
-/* Nombre máximo de un servicio */
 #define OMEGA_SERVICE_NAME_MAX 64
 
-/* IDs de servicio predefinidos */
 #define OMEGA_SERVICE_ECHO  1u
 #define OMEGA_SERVICE_TIME  2u
 
@@ -38,7 +36,6 @@ typedef struct {
 
 /*
  * Inicializa un servicio con un nombre y un handler.
- * Devuelve 0 en éxito, -1 en error.
  */
 int omega_service_init(omega_service_t *svc,
                        uint32_t service_id,
@@ -47,9 +44,12 @@ int omega_service_init(omega_service_t *svc,
 
 /*
  * Procesa el siguiente mensaje pendiente del inbox.
- * Devuelve 0 si procesó un mensaje, -1 si no había ninguno o hubo error.
+ * Si hay un mensaje, invoca el handler y escribe la respuesta en *out.
+ * Devuelve:
+ *   0  si procesó un mensaje correctamente
+ *  -1  si no había mensaje o hubo error
  */
-int omega_service_step(omega_service_t *svc);
+int omega_service_step(omega_service_t *svc, omega_message_t *out);
 
 /*
  * Handlers predefinidos.
@@ -61,7 +61,7 @@ int omega_service_handler_time(const omega_message_t *req,
                                omega_message_t *resp);
 
 /*
- * Devuelve un puntero a un nombre estático para un service_id conocido.
+ * Devuelve un nombre estático para un service_id conocido.
  * Devuelve NULL si no lo conoce.
  */
 const char *omega_service_name_of(uint32_t service_id);

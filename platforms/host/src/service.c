@@ -1,6 +1,6 @@
 /*
  * OMEGA — Host prototype
- * service.c
+ * service.c (v2)
  */
 
 #include "omega/service.h"
@@ -26,24 +26,16 @@ int omega_service_init(omega_service_t *svc,
     return 0;
 }
 
-int omega_service_step(omega_service_t *svc) {
-    if (svc == NULL || !svc->valid) return -1;
+int omega_service_step(omega_service_t *svc, omega_message_t *out) {
+    if (svc == NULL || !svc->valid || out == NULL) return -1;
 
     omega_message_t request;
     if (omega_endpoint_recv(&svc->inbox, &request) != 0) return -1;
 
-    omega_message_t response;
-    if (omega_message_init(&response, request.id, request.length) != 0) return -1;
+    if (omega_message_init(out, request.id, request.length) != 0) return -1;
 
-    if (svc->handler(&request, &response) != 0) return -1;
+    if (svc->handler(&request, out) != 0) return -1;
 
-    /* El endpoint de respuesta es simulado: devolvemos -1 porque el
-     * caller debe encargarse de recoger la response.
-     * En este prototipo, la response se entrega al caller como out.
-     *
-     * Nota: para simplificar, aquí el service_step solo procesa y
-     * deja la response en un buffer estático recuperable.
-     */
     return 0;
 }
 
@@ -62,10 +54,8 @@ int omega_service_handler_time(const omega_message_t *req,
                                omega_message_t *resp) {
     if (req == NULL || resp == NULL) return -1;
 
-    /* Contador monótono simulado */
     g_time_counter++;
 
-    /* Codificamos el contador en los primeros bytes del payload */
     uint32_t n = (req->length < sizeof(uint32_t)) ? req->length : sizeof(uint32_t);
     memcpy(resp->payload, &g_time_counter, n);
     resp->length = n;

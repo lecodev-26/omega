@@ -1,6 +1,6 @@
 /*
  * OMEGA — Host prototype
- * main.c (v2)
+ * main.c (v3)
  */
 
 #include <stdio.h>
@@ -8,6 +8,7 @@
 #include "omega/message.h"
 #include "omega/endpoint.h"
 #include "omega/capability.h"
+#include "omega/service.h"
 
 static void run_transaction(omega_endpoint_t *to_server,
                             omega_endpoint_t *to_client,
@@ -67,7 +68,7 @@ static void demo_capabilities(void) {
     printf("\n--- Capabilities v2 (con delegación) ---\n");
 
     omega_capability_t root;
-    if (omega_capability_init(&root, 1, /*owner*/100,
+    if (omega_capability_init(&root, 1, 100,
         OMEGA_CAP_RIGHT_READ | OMEGA_CAP_RIGHT_WRITE | OMEGA_CAP_RIGHT_GRANT) != 0) {
         return;
     }
@@ -84,7 +85,7 @@ static void demo_capabilities(void) {
            child.object_id, child.owner_id, child.rights);
 
     omega_capability_t delegated;
-    if (omega_capability_delegate(&root, /*new owner*/200, &delegated) != 0) {
+    if (omega_capability_delegate(&root, 200, &delegated) != 0) {
         printf("ERROR: no se pudo delegar\n");
         return;
     }
@@ -97,8 +98,63 @@ static void demo_capabilities(void) {
     }
 }
 
+static void demo_services(void) {
+    printf("\n--- Services ---\n");
+
+    omega_service_t echo_svc;
+    if (omega_service_init(&echo_svc, OMEGA_SERVICE_ECHO, "echo",
+        omega_service_handler_echo) != 0) {
+        printf("ERROR: no se pudo crear echo service\n");
+        return;
+    }
+
+    omega_service_t time_svc;
+    if (omega_service_init(&time_svc, OMEGA_SERVICE_TIME, "time",
+        omega_service_handler_time) != 0) {
+        printf("ERROR: no se pudo crear time service\n");
+        return;
+    }
+
+    /* Cliente envía request al echo service */
+    omega_message_t req;
+    if (omega_message_init(&req, 7, 64) != 0) return;
+    omega_message_fill_pattern(&req);
+
+    if (omega_endpoint_send(&echo_svc.inbox, &req) != 0) {
+        printf("ERROR: no se pudo enviar al echo service\n");
+        return;
+    }
+
+    /* Servicio procesa */
+    omega_message_t resp;
+    if (omega_service_step(&echo_svc, &resp) != 0) {
+        printf("ERROR: echo service no procesó\n");
+        return;
+    }
+
+    if (omega_message_verify_pattern(&resp) != 0) {
+        printf("ERROR: respuesta del echo service corrupta\n");
+        return;
+    }
+    printf("Echo service: OK (payload=%u bytes)\n", (unsigned)resp.length);
+
+    /* Time service: dos invocaciones */
+    omega_message_t t_req;
+    if (omega_message_init(&t_req, 8, 8) != 0) return;
+
+    omega_message_t t_resp1, t_resp2;
+    if (omega_service_handler_time(&t_req, &t_resp1) != 0) return;
+    if (omega_service_handler_time(&t_req, &t_resp2) != 0) return;
+
+    uint32_t t1 = 0, t2 = 0;
+    memcpy(&t1, t_resp1.payload, sizeof(uint32_t));
+    memcpy(&t2, t_resp2.payload, sizeof(uint32_t));
+    printf("Time service: t1=%u t2=%u (monótono: %s)\n",
+           t1, t2, (t2 > t1) ? "sí" : "no");
+}
+
 int main(void) {
-    printf("=== OMEGA Host Prototype v2 ===\n");
+    printf("=== OMEGA Host Prototype v3 ===\n");
     printf("Esto NO es el kernel de OMEGA. Es un banco de pruebas conceptual.\n\n");
 
     omega_endpoint_t to_server;
@@ -113,6 +169,7 @@ int main(void) {
     run_transaction(&to_server, &to_client, OMEGA_MSG_SIZE_4096);
 
     demo_capabilities();
+    demo_services();
 
     printf("\n=== Fin ===\n");
     return 0;
