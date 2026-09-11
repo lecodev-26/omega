@@ -17,7 +17,9 @@
 | UART funcional | ✅ Verificado |
 | Salida controlada por UART | ✅ Verificado |
 | Vector table + excepciones | ✅ Verificado |
-| Handler detallado (ESR/ELR/FAR/SPSR) | ✅ Verificado |
+| Handler detallado | ✅ Verificado |
+| ARM Generic Timer (polling) | ✅ Verificado |
+| GIC + IRQ real | ⏳ Pendiente |
 | Hardware real | ❌ No disponible |
 | Kernel OMEGA | ❌ No iniciado |
 
@@ -27,11 +29,12 @@
 - **M1 — Especificación arquitectónica** (parcial: ADR-0001)
 - **M2 — Prototipo host** ✅ (host prototype v3)
 - **M3 — Build ARM64** ✅
-- **M4 — Boot en QEMU** ✅ (bare-metal minimal)
+- **M4 — Boot en QEMU** ✅
 - **M4.1 — UART + salida controlada** ✅
 - **M4.2 — Vector table + excepciones** ✅
+- **M4.3 — ARM Generic Timer (polling)** ✅
 - M5 — Boot en hardware real
-- M6 — Timer + interrupciones
+- M6 — GIC + interrupciones reales
 - M7 — IPC en kernel
 - M8 — Primer servicio en user space
 - M9 — Servicios de memoria
