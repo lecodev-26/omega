@@ -21,3 +21,6 @@ Thumbs.db
 # Termux / local
 *.log
 tmp/
+
+# Kernel build
+kernel/build/
