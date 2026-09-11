@@ -106,3 +106,24 @@ system registers deben haberse preservado (no modificados por el handler).
 ejemplo, un `brk` inesperado), el handler puede decidir no retornar y
 quedarse en bucle infinito. Esto es válido pero debe ser una decisión
 consciente.
+
+## Regla sobre multitarea cooperativa
+
+El cambio de contexto cooperativo entre tareas requiere:
+
+1. **Guardar solo callee-saved** (x19-x28, x29/FP, x30/LR, SP, PC) en la ABI AAPCS64.
+2. **Inicializar el stack de una tarea nueva** apuntando al tope alineado a 16 bytes.
+3. **PC de una tarea nueva** apunta a un trampoline que llama a su entry point.
+4. **Trampoline por tarea**: `task_trampoline` recibe el puntero a la task en x19, extrae el entry, y lo llama. Si retorna, marca la task como `FINISHED`.
+5. **El primer `task_yield()`** no tiene tarea previa. Usa `task_start_first` que solo carga el contexto de la siguiente tarea y salta.
+
+**Estructura del `task_context_t`:**
+- x19-x28 (10 registros)
+- x29 (FP)
+- x30 (LR)
+- SP
+- PC
+
+Total: 14 × 8 = 112 bytes.
+
+**Verificado:** 2 tareas cooperativas (`[A][B][A][B]...`) funcionan correctamente en QEMU virt aarch64.
