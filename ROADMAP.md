@@ -14,7 +14,10 @@
 | Simulación host Piloto 1 | ✅ Funcional |
 | ARM64 build (nativo) | ✅ Verificado |
 | Bare-metal boot en QEMU | ✅ Verificado |
-| Toolchain bare-metal | ✅ Verificado |
+| UART funcional | ✅ Verificado |
+| Salida controlada por UART | ✅ Verificado |
+| Vector table + excepciones | ✅ Verificado |
+| Handler detallado (ESR/ELR/FAR/SPSR) | ✅ Verificado |
 | Hardware real | ❌ No disponible |
 | Kernel OMEGA | ❌ No iniciado |
 
@@ -25,16 +28,19 @@
 - **M2 — Prototipo host** ✅ (host prototype v3)
 - **M3 — Build ARM64** ✅
 - **M4 — Boot en QEMU** ✅ (bare-metal minimal)
+- **M4.1 — UART + salida controlada** ✅
+- **M4.2 — Vector table + excepciones** ✅
 - M5 — Boot en hardware real
-- M6 — IPC en kernel
-- M7 — Primer servicio en user space
-- M8 — Servicios de memoria
-- M9 — Drivers
-- M10 — Sistema de archivos
-- M11 — Red
-- M12 — Validación de seguridad
-- M13 — Entorno de desarrollo
-- M14 — SO experimental usable
+- M6 — Timer + interrupciones
+- M7 — IPC en kernel
+- M8 — Primer servicio en user space
+- M9 — Servicios de memoria
+- M10 — Drivers
+- M11 — Sistema de archivos
+- M12 — Red
+- M13 — Validación de seguridad
+- M14 — Entorno de desarrollo
+- M15 — SO experimental usable
 
 ## Lo que NO se hace ahora
 
