@@ -8,15 +8,48 @@ on:
 
 jobs:
   docs-check:
+    name: Documentación
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verificar estructura
+      - name: Verificar archivos fundacionales
         run: |
           test -f README.md
           test -f ROADMAP.md
           test -f CONTRIBUTING.md
           test -f SECURITY.md
+          test -f LICENSE
+          test -f CHANGELOG.md
+          echo "Archivos fundacionales OK"
+      - name: Verificar estructura de documentación
+        run: |
           test -d docs
+          test -d docs/vision
+          test -d docs/architecture
           test -d docs/decisions
-          echo "Estructura OK"
+          test -d docs/requirements
+          test -d docs/experiments
+          test -d docs/development
+          test -d docs/hardware
+          echo "Estructura docs OK"
+
+  host-build:
+    name: Host prototype (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar clang y make
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang make
+      - name: Compilar host prototype
+        working-directory: platforms/host
+        run: make CC=clang
+      - name: Ejecutar tests
+        working-directory: platforms/host
+        run: make CC=clang test
+      - name: Verificar binario
+        working-directory: platforms/host
+        run: |
+          test -f build/omega-host
+          file build/omega-host
