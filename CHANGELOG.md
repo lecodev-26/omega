@@ -3,23 +3,27 @@
 ## [Unreleased]
 
 ### Added
-- Estructura inicial del repositorio.
-- Documentación fundacional (README, ROADMAP, CONTRIBUTING, SECURITY).
-- Directorios preparados para docs, kernel, user, tools, tests, experiments.
-
-## [0.1.0] — 2026-09-11
-
-### Added
-- Estructura inicial del repositorio OMEGA.
-- Documentación fundacional (README, ROADMAP, CONTRIBUTING, SECURITY).
-- Documentación estructurada en `docs/` con índices y ADR-0001.
-- Host prototype v3: mensajes, endpoints, capabilities (con delegación), servicios (echo, time).
-- Makefile con target `arm64`.
-- GitHub Actions CI: docs-check + host-build.
-- Simulación host del Piloto 1 IPC: benchmark de 10.000 iteraciones × 4 tamaños.
-- Script de análisis en Python con mediana, p95, p99 y CI bootstrap.
+- Repositorio inicial con documentación estructurada.
+- Host prototype v3: mensajes, endpoints, capabilities, servicios.
+- Simulación host del Piloto 1 IPC con análisis estadístico.
+- Kernel prototype:
+  - Boot bare-metal aarch64 en QEMU virt.
+  - UART PL011.
+  - Vector table + excepciones (SYNC, IRQ, FIQ, SError).
+  - ARM Generic Timer.
+  - GIC + IRQs reales.
+  - Multitarea cooperativa.
+  - IPC básico (endpoints + mensajes).
+- Documentación:
+  - 19 documentos conceptuales (0.1.0–0.1.18).
+  - Requisitos y propiedades verificables (R1-FINAL).
+  - Diseño experimental (R2).
+  - Protocolo Piloto 1.
+  - ADR-0001: Fundación del kernel.
+  - ADR-0002: Kernel prototype.
+  - Documento de brecha conceptual.
 
 ### Notes
-- No hay kernel funcional.
-- No hay sistema operativo ejecutable.
-- La simulación del Piloto 1 NO es el experimento científico real.
+- No hay hardware real disponible todavía.
+- El kernel prototype corre únicamente en QEMU.
+- No hay capabilities, MMU ni user space todavía.
