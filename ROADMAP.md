@@ -12,16 +12,16 @@
 | Documentación estructurada | ✅ Creada |
 | Host prototype v3 | ✅ Funcional |
 | Simulación host Piloto 1 | ✅ Funcional |
-| ARM64 build (nativo) | ✅ Verificado |
-| Bare-metal boot en QEMU | ✅ Verificado |
-| UART funcional | ✅ Verificado |
-| Vector table + excepciones | ✅ Verificado |
-| ARM Generic Timer (polling) | ✅ Verificado |
-| GIC + IRQ real | ✅ Verificado |
-| Timer periódico con IRQ | ✅ Verificado |
-| MMU | ❌ No iniciado |
-| Scheduler | ❌ No iniciado |
-| Kernel OMEGA | ❌ No iniciado |
+| Kernel prototype — boot | ✅ Verificado |
+| Kernel prototype — UART | ✅ Verificado |
+| Kernel prototype — excepciones | ✅ Verificado |
+| Kernel prototype — timer | ✅ Verificado |
+| Kernel prototype — IRQs reales | ✅ Verificado |
+| Kernel prototype — multitarea cooperativa | ✅ Verificado |
+| Kernel prototype — preemption con timer | ⏳ Pendiente |
+| Kernel prototype — MMU | ❌ No iniciado |
+| Kernel prototype — IPC | ❌ No iniciado |
+| Kernel prototype — user space | ❌ No iniciado |
 | Hardware real | ❌ No disponible |
 
 ## Milestones
@@ -35,16 +35,16 @@
 - **M4.2 — Vector table + excepciones** ✅
 - **M4.3 — ARM Generic Timer (polling)** ✅
 - **M4.4 — GIC + IRQ real** ✅
-- M5 — MMU + memoria virtual
-- M6 — Scheduler básico
-- M7 — IPC en kernel
-- M8 — Primer servicio en user space
-- M9 — Boot en hardware real
+- **M5 — Multitarea cooperativa** ✅
+- M6 — Preemption con timer
+- M7 — MMU + memoria virtual
+- M8 — IPC
+- M9 — User space
 - M10 — Drivers
-- M11 — Sistema de archivos
-- M12 — Red
-- M13 — Validación de seguridad
-- M14 — Entorno de desarrollo
+- M11 — Boot en hardware real
+- M12 — Sistema de archivos
+- M13 — Red
+- M14 — Validación de seguridad
 - M15 — SO experimental usable
 
 ## Lo que NO se hace ahora
