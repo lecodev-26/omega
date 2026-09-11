@@ -161,3 +161,36 @@ lo está, el acceso provoca un **Alignment fault** (DFSC = 0x21 en el ESR).
    fault), es un problema de alineación.
 3. `FAR_EL1` indica la dirección del acceso fallido.
 4. `llvm-objdump -d` en `ELR_EL1` muestra la instrucción concreta.
+
+## Regla sobre capabilities
+
+Las capabilities en el kernel prototype son **tokens de autoridad**
+que designan un objeto (por ahora, un endpoint IPC) con derechos
+concretos.
+
+**Diseño actual:**
+
+- Cada tarea tiene una **tabla de capabilities** (CNode conceptual).
+- Tamaño máximo: 16 capabilities por tarea.
+- Derechos: `READ`, `WRITE`, `GRANT`, `REVOKE`.
+- `ipc_send(endpoint, msg)` **requiere** una capability en la tabla
+  de la tarea actual que designe `endpoint` con `WRITE`.
+- Si no hay capability, `ipc_send` retorna -1 (denegado).
+
+**Verificado:** dos tareas se comunican por IPC solo si tienen las
+capabilities correspondientes. Una tarea sin capability al endpoint
+destino no puede enviar.
+
+**Limitaciones actuales:**
+
+- No hay paso de capabilities en los mensajes.
+- No hay revocación en cascada (una capability derivada no se revoca
+  al revocar la madre).
+- No hay capabilities de memoria, CPU ni otros objetos.
+- El kernel concede capabilities manualmente en `kmain`.
+
+**Próximos pasos:**
+
+- Añadir paso de capabilities en mensajes IPC.
+- Añadir capabilities de memoria (cuando haya MMU).
+- Añadir revocación en cascada.
