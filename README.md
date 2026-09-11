@@ -1,4 +1,6 @@
 # OMEGA
+\n[![CI](https://github.com/lecodev-26/omega/actions/workflows/ci.yml/badge.svg)](https://github.com/lecodev-26/omega/actions/workflows/ci.yml)
+
 
 OMEGA es un proyecto open source de investigación y desarrollo a muy largo plazo
 para construir un sistema operativo de nueva generación.
