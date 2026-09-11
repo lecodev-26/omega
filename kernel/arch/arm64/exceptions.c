@@ -1,6 +1,13 @@
+/*
+ * OMEGA — Kernel
+ * exceptions.c — Handlers de excepciones (con preemption)
+ */
+
+#include <stddef.h>
 #include "omega/exceptions.h"
 #include "omega/uart.h"
 #include "omega/gic.h"
+#include "omega/task.h"
 
 static omega_exception_info_t g_last_info;
 static uint64_t g_irq_count = 0;
@@ -32,16 +39,17 @@ void exception_handler_c(omega_exception_class_t class,
                          uint64_t spsr_el1) {
     if (class == OMEGA_EXC_IRQ) {
         uint32_t irq = gic_acknowledge();
+        g_irq_count++;
 
         if (irq == TIMER_IRQ) {
-            g_irq_count++;
-            timer_irq_handler();
+            timer_irq_handler();      /* rearmar el timer */
+            task_tick_from_irq();     /* decidir cambio de tarea */
         }
         gic_eoi(irq & 0x3FF);
-        return;   /* Retornar de la IRQ */
+        return;
     }
 
-    /* Otras clases: registrar e imprimir (no retornar, cuelga) */
+    /* Otras clases: registrar e imprimir */
     g_last_info.class = class;
     g_last_info.esr_el1 = esr_el1;
     g_last_info.elr_el1 = elr_el1;
@@ -62,7 +70,6 @@ void exception_handler_c(omega_exception_class_t class,
     uart_puts("  SPSR_EL1: "); uart_puthex64(spsr_el1); uart_puts("\n");
     uart_puts("[fin excepcion]\n");
 
-    /* Para SYNC no recuperable, quedarse en bucle infinito */
     for (;;) {
         __asm__ volatile("wfe");
     }

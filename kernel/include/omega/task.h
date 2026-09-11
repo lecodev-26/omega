@@ -63,3 +63,29 @@ void task_entry_point(task_t *t);
 void task_finished(void);
 
 #endif /* OMEGA_TASK_H */
+
+/*
+ * Índice de la tarea a la que hay que cambiar en el próximo retorno
+ * de IRQ. -1 significa "no cambiar".
+ *
+ * Usado por el stub de IRQ. El handler C lo actualiza, el assembly
+ * lo consulta.
+ */
+extern int g_preempt_next_idx;
+
+/*
+ * Maneja el tick del timer desde el handler de IRQ.
+ * Decide si cambiar de tarea y actualiza g_preempt_next_idx.
+ */
+void task_tick_from_irq(void);
+
+/*
+ * Devuelve el contexto de la tarea indicada (para el assembly).
+ */
+task_context_t *task_context_of(int idx);
+
+/*
+ * Actualiza g_current al índice dado.
+ */
+void task_set_current(int idx);
+

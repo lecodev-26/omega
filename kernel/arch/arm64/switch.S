@@ -105,3 +105,113 @@ task_trampoline_irq:
 1:
     wfe
     b 1b
+
+/* ============================================================
+ * void context_switch_from_irq(task_context_t *from, task_context_t *to)
+ *   x0 = from
+ *   x1 = to
+ *
+ * Se llama desde el stub de IRQ, con sp apuntando al marco
+ * de 256 bytes que contiene x0-x30 de la tarea interrumpida.
+ *
+ * Hace el cambio de contexto completo:
+ *   - Copia x0-x30 del stack actual a `from`.
+ *   - Guarda SP (antes del marco), PC (ELR_EL1), SPSR.
+ *   - Copia x0-x30 de `to` al stack actual.
+ *   - Cambia SP, ELR_EL1, SPSR_EL1.
+ *   - No retorna: hace eret.
+ * ============================================================ */
+.global context_switch_from_irq
+context_switch_from_irq:
+    /* --- Guardar x0-x30 del stack actual a `from` (offsets 0..240) --- */
+    ldp x2, x3, [sp, #0]
+    stp x2, x3, [x0, #0]
+    ldp x2, x3, [sp, #16]
+    stp x2, x3, [x0, #16]
+    ldp x2, x3, [sp, #32]
+    stp x2, x3, [x0, #32]
+    ldp x2, x3, [sp, #48]
+    stp x2, x3, [x0, #48]
+    ldp x2, x3, [sp, #64]
+    stp x2, x3, [x0, #64]
+    ldp x2, x3, [sp, #80]
+    stp x2, x3, [x0, #80]
+    ldp x2, x3, [sp, #96]
+    stp x2, x3, [x0, #96]
+    ldp x2, x3, [sp, #112]
+    stp x2, x3, [x0, #112]
+    ldp x2, x3, [sp, #128]
+    stp x2, x3, [x0, #128]
+    ldp x2, x3, [sp, #144]
+    stp x2, x3, [x0, #144]
+    ldp x2, x3, [sp, #160]
+    stp x2, x3, [x0, #160]
+    ldp x2, x3, [sp, #176]
+    stp x2, x3, [x0, #176]
+    ldp x2, x3, [sp, #192]
+    stp x2, x3, [x0, #192]
+    ldp x2, x3, [sp, #208]
+    stp x2, x3, [x0, #208]
+    ldp x2, x3, [sp, #224]
+    stp x2, x3, [x0, #224]
+    ldr x2, [sp, #240]
+    str x2, [x0, #240]
+
+    /* Guardar SP de la tarea (sp + 256, antes del marco) */
+    add x2, sp, #256
+    str x2, [x0, #248]
+
+    /* Guardar PC (ELR_EL1) y SPSR */
+    mrs x2, elr_el1
+    str x2, [x0, #256]
+    mrs x2, spsr_el1
+    str x2, [x0, #264]
+
+    /* --- Cargar x0-x30 de `to` en el stack actual --- */
+    ldp x2, x3, [x1, #0]
+    stp x2, x3, [sp, #0]
+    ldp x2, x3, [x1, #16]
+    stp x2, x3, [sp, #16]
+    ldp x2, x3, [x1, #32]
+    stp x2, x3, [sp, #32]
+    ldp x2, x3, [x1, #48]
+    stp x2, x3, [sp, #48]
+    ldp x2, x3, [x1, #64]
+    stp x2, x3, [sp, #64]
+    ldp x2, x3, [x1, #80]
+    stp x2, x3, [sp, #80]
+    ldp x2, x3, [x1, #96]
+    stp x2, x3, [sp, #96]
+    ldp x2, x3, [x1, #112]
+    stp x2, x3, [sp, #112]
+    ldp x2, x3, [x1, #128]
+    stp x2, x3, [sp, #128]
+    ldp x2, x3, [x1, #144]
+    stp x2, x3, [sp, #144]
+    ldp x2, x3, [x1, #160]
+    stp x2, x3, [sp, #160]
+    ldp x2, x3, [x1, #176]
+    stp x2, x3, [sp, #176]
+    ldp x2, x3, [x1, #192]
+    stp x2, x3, [sp, #192]
+    ldp x2, x3, [x1, #208]
+    stp x2, x3, [sp, #208]
+    ldp x2, x3, [x1, #224]
+    stp x2, x3, [sp, #224]
+    ldr x2, [x1, #240]
+    str x2, [sp, #240]
+
+    /* Cambiar SP: apunta al marco de la nueva tarea */
+    ldr x2, [x1, #248]
+    sub x2, x2, #256
+    mov sp, x2
+
+    /* Cargar PC y SPSR de `to` */
+    ldr x2, [x1, #256]
+    msr elr_el1, x2
+    ldr x2, [x1, #264]
+    msr spsr_el1, x2
+
+    /* eret */
+    isb
+    eret

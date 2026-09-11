@@ -149,3 +149,67 @@ task_t *task_get(int idx) {
     if (idx < 0 || idx >= g_num_tasks) return NULL;
     return &g_tasks[idx];
 }
+
+/* ============================================================
+ * Preemption
+ * ============================================================ */
+
+int g_preempt_next_idx = -1;
+
+/*
+ * Llamado desde el handler de IRQ.
+ * Decide si cambiar de tarea. NO hace el cambio directamente.
+ * Actualiza g_preempt_next_idx con el índice de la nueva tarea.
+ */
+void task_tick_from_irq(void) {
+    if (g_num_tasks == 0) {
+        g_preempt_next_idx = -1;
+        return;
+    }
+
+    /* Incrementar el contador de IRQs de la tarea actual */
+    if (g_current >= 0) {
+        g_tasks[g_current].irqs++;
+    }
+
+    /* Round-robin: elegir la siguiente tarea */
+    int prev = g_current;
+    int start = (g_current + 1) % g_num_tasks;
+    int idx = start;
+    int next = -1;
+
+    do {
+        if (g_tasks[idx].state == TASK_STATE_READY ||
+            g_tasks[idx].state == TASK_STATE_RUNNING) {
+            next = idx;
+            break;
+        }
+        idx = (idx + 1) % g_num_tasks;
+    } while (idx != start);
+
+    if (next < 0 || next == prev) {
+        g_preempt_next_idx = -1;
+        return;
+    }
+
+    /* Actualizar estados */
+    if (prev >= 0) {
+        g_tasks[prev].state = TASK_STATE_READY;
+    }
+    g_tasks[next].state = TASK_STATE_RUNNING;
+
+    /* Actualizar g_current ANTES de retornar al assembly */
+    g_current = next;
+
+    /* Indicar al assembly que hay que cambiar de tarea */
+    g_preempt_next_idx = next;
+}
+
+task_context_t *task_context_of(int idx) {
+    if (idx < 0 || idx >= g_num_tasks) return NULL;
+    return &g_tasks[idx].context;
+}
+
+void task_set_current(int idx) {
+    g_current = idx;
+}
