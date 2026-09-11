@@ -14,3 +14,18 @@ al copiar/pegar en Termux.
 
 Esta regla se aplica a cualquier archivo con indentación significativa:
 Makefiles, Python, YAML.
+
+## Regla sobre printf y strings que empiezan por guion
+
+En bash, `printf '- texto'` falla con "invalid option" porque interpreta
+`-` como una opción. La solución es usar el separador `--`:
+
+```bash
+# INCORRECTO
+printf -- '- item\n'  # Fallará
+
+# CORRECTO
+printf -- '- item\n'  # OK
+```
+
+Esta regla se aplica siempre que el string a imprimir empiece por -.
