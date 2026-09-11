@@ -1,25 +1,26 @@
 /*
  * OMEGA — Kernel
- * task.c — Tareas y scheduler cooperativo (13a)
+ * task.c — Tareas y scheduler cooperativo (13a) + IPC
  */
 
 #include <stddef.h>
 #include "omega/task.h"
+#include "omega/ipc.h"
 #include "omega/uart.h"
 
 /* Importados de switch.S */
 extern void context_switch(task_context_t *from, task_context_t *to);
 extern void task_trampoline(void);
 extern void task_finished(void);
+extern void task_start_first(task_context_t *to);
 
-static task_t g_tasks[MAX_TASKS];
+static task_t g_tasks[MAX_TASKS] __attribute__((aligned(16)));
 static int    g_num_tasks = 0;
 static int    g_current = -1;
 
-/* Usado por el trampoline para saber qué task ejecutar. */
-
 void task_init(void) {
     for (int i = 0; i < MAX_TASKS; i++) {
+        g_tasks[i].idx = i;
         g_tasks[i].state = TASK_STATE_UNUSED;
         g_tasks[i].name[0] = '\0';
         g_tasks[i].yields = 0;
@@ -34,6 +35,7 @@ int task_create(const char *name, void (*entry)(void)) {
 
     int idx = g_num_tasks++;
     task_t *t = &g_tasks[idx];
+    t->idx = idx;
 
     int i = 0;
     while (name[i] != '\0' && i < TASK_NAME_MAX - 1) {
@@ -60,49 +62,33 @@ int task_create(const char *name, void (*entry)(void)) {
     t->context.x29 = 0;
     t->context.x30 = 0;
 
-    /*
-     * Inicializar SP: apunta al tope del stack de la tarea.
-     * El stack crece hacia abajo. Reservamos 16 bytes para
-     * alinear a 16 bytes (requisito AAPCS64).
-     */
+    /* SP al tope del stack, alineado a 16 */
     uintptr_t sp_top = (uintptr_t)(t->stack + TASK_STACK_SIZE);
-    sp_top &= ~((uintptr_t)0xF);   /* alinear a 16 */
+    sp_top &= ~((uintptr_t)0xF);
     t->context.sp = sp_top;
 
-    /*
-     * Inicializar PC: apunta al trampoline.
-     * Cuando esta tarea sea programada por primera vez, saltará
-     * al trampoline, que llamará a entry().
-     */
+    /* PC al trampoline */
     t->context.pc = (uint64_t)task_trampoline;
 
-    /*
-     * x19: convención para pasar el puntero a la task al trampoline.
-     * El trampoline espera x19 = puntero a task.
-     */
+    /* x19 lleva el puntero a la task (usado por el trampoline) */
     t->context.x19 = (uint64_t)t;
+
+    /* Registrar endpoint IPC para esta tarea */
+    ipc_register_endpoint((uint32_t)idx);
 
     return idx;
 }
 
-/*
- * task_entry_point(task) — llamada desde el trampoline.
- * Extrae entry() del struct task y la ejecuta.
- */
 void task_entry_point(task_t *t) {
     if (t && t->entry) {
         t->entry();
     }
 }
 
-/*
- * task_finished() — llamada desde el trampoline si entry() retorna.
- */
 void task_finished(void) {
     if (g_current >= 0) {
         g_tasks[g_current].state = TASK_STATE_FINISHED;
     }
-    /* Ceder el control para siempre (la siguiente tarea arrancará) */
     for (;;) {
         task_yield();
     }
@@ -111,7 +97,6 @@ void task_finished(void) {
 int task_schedule_next(void) {
     if (g_num_tasks == 0) return -1;
 
-    /* Buscar la siguiente tarea en estado READY */
     int start = (g_current + 1) % g_num_tasks;
     int idx = start;
     do {
@@ -134,20 +119,25 @@ void task_yield(void) {
     int next = task_schedule_next();
 
     if (next < 0) {
-        /* No hay siguiente tarea; seguir con la actual */
         return;
     }
 
     if (prev == next) {
-        /* Solo hay una tarea; no hace falta cambiar contexto */
         g_tasks[prev].yields++;
         return;
     }
 
-    if (prev >= 0) {
-        g_tasks[prev].state = TASK_STATE_READY;
+    if (prev < 0) {
+        /* Primera llamada: no hay tarea previa.
+         * Arrancar directamente la siguiente tarea. */
+        g_tasks[next].state = TASK_STATE_RUNNING;
+        g_tasks[next].yields++;
+        task_start_first(&g_tasks[next].context);
+        /* Nunca retorna */
+        return;
     }
 
+    g_tasks[prev].state = TASK_STATE_READY;
     g_tasks[next].yields++;
 
     context_switch(&g_tasks[prev].context, &g_tasks[next].context);
