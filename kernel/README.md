@@ -18,6 +18,7 @@ El kernel prototype **funciona** y soporta:
 - ✅ Multitarea cooperativa (`task_yield()`)
 - ✅ IPC básico (endpoints + mensajes)
 - ✅ Capabilities (object capabilities para endpoints)
+- ✅ Paso de capabilities en mensajes IPC
 
 ## Qué NO hace todavía
 
