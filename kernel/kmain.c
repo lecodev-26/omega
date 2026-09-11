@@ -6,9 +6,6 @@
 #include "omega/ipc.h"
 #include "omega/cap.h"
 
-/*
- * Concede una capability a la tarea actual que designa un endpoint.
- */
 static void grant_endpoint_cap(uint64_t endpoint_id, uint64_t rights) {
     capability_t cap;
     cap.object_id  = endpoint_id;
@@ -22,64 +19,83 @@ static void grant_endpoint_cap(uint64_t endpoint_id, uint64_t rights) {
 }
 
 static void task_a(void) {
-    /* Tarea A: conceder cap al endpoint 1 (B) */
+    /* Tarea A: cap al endpoint B (1) con WRITE|READ */
     grant_endpoint_cap(1, CAP_RIGHT_WRITE | CAP_RIGHT_READ);
-    uart_puts("[A: cap a endpoint 1 concedida]");
 
-    /* Probar que A NO tiene cap al endpoint 99 (inexistente) */
-    if (cap_lookup(99, CAP_RIGHT_WRITE) < 0) {
-        uart_puts("[A: cap a 99 NO existe (correcto)]");
+    /* Cap "objeto 5" con READ|GRANT (esta se va a delegar) */
+    grant_endpoint_cap(5, CAP_RIGHT_READ | CAP_RIGHT_GRANT);
+
+    uart_puts("[A: caps concedidas]");
+
+    /* Buscar el índice de la cap al objeto 5 para poder adjuntarla */
+    int cap5_idx = cap_lookup(5, CAP_RIGHT_READ | CAP_RIGHT_GRANT);
+    if (cap5_idx < 0) {
+        uart_puts("[A: ERROR cap5 no encontrada]");
+        for (;;) task_yield();
+    }
+
+    /* Enviar a B un mensaje adjuntando la cap al objeto 5 */
+    ipc_message_t msg;
+    msg.sender = 0;
+    msg.type = IPC_MSG_DATA;
+    msg.length = 3;
+    msg.has_cap = 0;
+    msg.payload[0] = 'H';
+    msg.payload[1] = 'i';
+    msg.payload[2] = '!';
+
+    if (ipc_send_with_cap(1, &msg, cap5_idx) == 0) {
+        uart_puts("[A: msg+cap enviado a B]");
+    } else {
+        uart_puts("[A: ERROR enviando msg+cap]");
     }
 
     for (;;) {
-        ipc_message_t msg;
-        msg.sender = 0;
-        msg.type = IPC_MSG_PING;
-        msg.length = 0;
-
-        if (ipc_send(1, &msg) == 0) {
-            uart_puts("[A->B ping]");
-        } else {
-            uart_puts("[A: send denegado]");
-        }
-
-        ipc_message_t in;
-        if (ipc_recv(&in) == 0) {
-            uart_puts("[A<-B pong]");
-        }
-
-        for (volatile int i = 0; i < 500000; i++) {}
         task_yield();
     }
 }
 
 static void task_b(void) {
-    /* Tarea B: conceder cap al endpoint 0 (A) */
+    /* Tarea B: cap al endpoint A (0) para poder responder */
     grant_endpoint_cap(0, CAP_RIGHT_WRITE | CAP_RIGHT_READ);
-    uart_puts("[B: cap a endpoint 0 concedida]");
+
+    uart_puts("[B: cap a 0 concedida]");
 
     for (;;) {
         ipc_message_t in;
         if (ipc_recv(&in) == 0) {
-            if (in.type == IPC_MSG_PING) {
-                ipc_message_t pong;
-                pong.sender = 1;
-                pong.type = IPC_MSG_PONG;
-                pong.length = 0;
-                if (ipc_send(0, &pong) == 0) {
-                    uart_puts("[B: pong enviado]");
+            uart_puts("[B: msg recibido");
+
+            if (in.has_cap) {
+                uart_puts(" con cap adjunta]");
+
+                /* Verificar que la cap recibida designa el objeto 5 */
+                int idx = cap_lookup(5, CAP_RIGHT_READ);
+                if (idx >= 0) {
+                    uart_puts("[B: cap al objeto 5 recibida OK]");
+                } else {
+                    uart_puts("[B: ERROR cap al objeto 5 no está]");
                 }
+
+                /* Verificar que NO se propagó GRANT */
+                int idx_grant = cap_lookup(5, CAP_RIGHT_GRANT);
+                if (idx_grant < 0) {
+                    uart_puts("[B: GRANT NO propagado (correcto)]");
+                } else {
+                    uart_puts("[B: ERROR GRANT propagado]");
+                }
+            } else {
+                uart_puts(" sin cap]");
             }
         }
 
-        for (volatile int i = 0; i < 500000; i++) {}
         task_yield();
     }
 }
 
 void kmain(void) {
     uart_init();
-    uart_puts("OMEGA kernel v8 (capabilities)\n");
+    uart_puts("OMEGA kernel v9 (cap passing)\n");
     uart_puts("---\n");
 
     uart_puts("Inicializando excepciones...\n");

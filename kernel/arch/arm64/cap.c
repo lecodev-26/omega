@@ -132,3 +132,16 @@ int cap_count(void) {
     if (idx >= MAX_TASKS_FOR_CAP) return -1;
     return g_cap_tables[idx].count;
 }
+
+capability_t *cap_get(int idx) {
+    task_t *current = task_current();
+    if (current == NULL) return 0;
+
+    uint32_t task_idx = (uint32_t)current->idx;
+    if (task_idx >= MAX_TASKS_FOR_CAP) return 0;
+    if (idx < 0 || idx >= CAP_MAX_PER_TASK) return 0;
+
+    cap_table_t *tbl = &g_cap_tables[task_idx];
+    if (!tbl->caps[idx].valid) return 0;
+    return &tbl->caps[idx];
+}

@@ -71,3 +71,9 @@ void cap_revoke(int idx);
 int cap_count(void);
 
 #endif /* OMEGA_CAP_H */
+
+/*
+ * Devuelve un puntero a la capability en la tabla de la tarea actual.
+ * Devuelve NULL si el índice no es válido.
+ */
+capability_t *cap_get(int idx);
