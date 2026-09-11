@@ -18,9 +18,10 @@
 | Kernel prototype — timer | ✅ Verificado |
 | Kernel prototype — IRQs reales | ✅ Verificado |
 | Kernel prototype — multitarea cooperativa | ✅ Verificado |
+| Kernel prototype — IPC básico | ✅ Verificado |
 | Kernel prototype — preemption con timer | ⏳ Pendiente |
 | Kernel prototype — MMU | ❌ No iniciado |
-| Kernel prototype — IPC | ❌ No iniciado |
+| Kernel prototype — capabilities | ❌ No iniciado |
 | Kernel prototype — user space | ❌ No iniciado |
 | Hardware real | ❌ No disponible |
 
@@ -36,9 +37,10 @@
 - **M4.3 — ARM Generic Timer (polling)** ✅
 - **M4.4 — GIC + IRQ real** ✅
 - **M5 — Multitarea cooperativa** ✅
+- **M5.1 — IPC básico** ✅
 - M6 — Preemption con timer
 - M7 — MMU + memoria virtual
-- M8 — IPC
+- M8 — Capabilities
 - M9 — User space
 - M10 — Drivers
 - M11 — Boot en hardware real
