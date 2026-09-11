@@ -17,6 +17,7 @@ El kernel prototype **funciona** y soporta:
 - ✅ Interrupciones reales del timer
 - ✅ Multitarea cooperativa (`task_yield()`)
 - ✅ IPC básico (endpoints + mensajes)
+- ✅ Capabilities (object capabilities para endpoints)
 
 ## Qué NO hace todavía
 

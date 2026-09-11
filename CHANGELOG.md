@@ -14,6 +14,7 @@
   - GIC + IRQs reales.
   - Multitarea cooperativa.
   - IPC básico (endpoints + mensajes).
+  - Capabilities (object capabilities para endpoints IPC).
 - Documentación:
   - 19 documentos conceptuales (0.1.0–0.1.18).
   - Requisitos y propiedades verificables (R1-FINAL).
