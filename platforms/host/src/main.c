@@ -1,11 +1,6 @@
 /*
  * OMEGA — Host prototype
- * main.c
- *
- * Simula una transacción request-response entre un cliente y un servidor
- * conceptuales, usando endpoints en memoria.
- *
- * ESTO NO ES UN KERNEL. Es un banco de pruebas conceptual.
+ * main.c (v2)
  */
 
 #include <stdio.h>
@@ -42,7 +37,6 @@ static void run_transaction(omega_endpoint_t *to_server,
         return;
     }
 
-    /* Servidor genera response con el mismo payload */
     if (omega_message_init(&response, received.id, received.length) != 0) {
         printf("ERROR: no se pudo inicializar response\n");
         return;
@@ -69,8 +63,42 @@ static void run_transaction(omega_endpoint_t *to_server,
            (unsigned)payload_size);
 }
 
+static void demo_capabilities(void) {
+    printf("\n--- Capabilities v2 (con delegación) ---\n");
+
+    omega_capability_t root;
+    if (omega_capability_init(&root, 1, /*owner*/100,
+        OMEGA_CAP_RIGHT_READ | OMEGA_CAP_RIGHT_WRITE | OMEGA_CAP_RIGHT_GRANT) != 0) {
+        return;
+    }
+    printf("Root: object=%u owner=%u rights=0x%X\n",
+           root.object_id, root.owner_id, root.rights);
+
+    omega_capability_t child;
+    if (omega_capability_derive(&root, &child,
+        OMEGA_CAP_RIGHT_READ | OMEGA_CAP_RIGHT_GRANT) != 0) {
+        printf("ERROR: no se pudo derivar\n");
+        return;
+    }
+    printf("Child: object=%u owner=%u rights=0x%X\n",
+           child.object_id, child.owner_id, child.rights);
+
+    omega_capability_t delegated;
+    if (omega_capability_delegate(&root, /*new owner*/200, &delegated) != 0) {
+        printf("ERROR: no se pudo delegar\n");
+        return;
+    }
+    printf("Delegated: object=%u owner=%u rights=0x%X parent_owner=%u\n",
+           delegated.object_id, delegated.owner_id,
+           delegated.rights, delegated.parent_owner);
+
+    if (!omega_capability_has(&delegated, OMEGA_CAP_RIGHT_GRANT)) {
+        printf("Delegated NO tiene GRANT (correcto: no se propaga)\n");
+    }
+}
+
 int main(void) {
-    printf("=== OMEGA Host Prototype ===\n");
+    printf("=== OMEGA Host Prototype v2 ===\n");
     printf("Esto NO es el kernel de OMEGA. Es un banco de pruebas conceptual.\n\n");
 
     omega_endpoint_t to_server;
@@ -84,31 +112,7 @@ int main(void) {
     run_transaction(&to_server, &to_client, OMEGA_MSG_SIZE_512);
     run_transaction(&to_server, &to_client, OMEGA_MSG_SIZE_4096);
 
-    printf("\n--- Capabilities ---\n");
-    omega_capability_t root;
-    if (omega_capability_init(&root, 1, OMEGA_CAP_RIGHT_READ | OMEGA_CAP_RIGHT_WRITE) != 0) {
-        return 1;
-    }
-    printf("Root: object_id=%u rights=0x%X valid=%d\n",
-           root.object_id, root.rights, root.valid);
-
-    omega_capability_t child;
-    if (omega_capability_derive(&root, &child, OMEGA_CAP_RIGHT_READ) != 0) {
-        printf("ERROR: no se pudo derivar capability\n");
-        return 1;
-    }
-    printf("Child: object_id=%u rights=0x%X valid=%d\n",
-           child.object_id, child.rights, child.valid);
-
-    if (omega_capability_has(&child, OMEGA_CAP_RIGHT_READ)) {
-        printf("Child tiene READ\n");
-    }
-    if (!omega_capability_has(&child, OMEGA_CAP_RIGHT_WRITE)) {
-        printf("Child NO tiene WRITE (correcto)\n");
-    }
-
-    omega_capability_revoke(&child);
-    printf("Child revocada: valid=%d\n", child.valid);
+    demo_capabilities();
 
     printf("\n=== Fin ===\n");
     return 0;
