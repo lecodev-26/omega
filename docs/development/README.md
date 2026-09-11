@@ -127,3 +127,37 @@ El cambio de contexto cooperativo entre tareas requiere:
 Total: 14 × 8 = 112 bytes.
 
 **Verificado:** 2 tareas cooperativas (`[A][B][A][B]...`) funcionan correctamente en QEMU virt aarch64.
+
+## Regla sobre alineación de structs en bare-metal aarch64
+
+En bare-metal aarch64, el compilador puede generar instrucciones de acceso
+a memoria que **requieren alineación natural** (`stur x8`, `stp`, `ldur`,
+etc.). Si el compilador asume que un struct está alineado a 8 bytes y no
+lo está, el acceso provoca un **Alignment fault** (DFSC = 0x21 en el ESR).
+
+**Regla del proyecto:**
+
+> Toda struct en el kernel que pueda ser accedida por el compilador con
+> instrucciones de 8 bytes DEBE estar declarada con la alineación
+> adecuada. Usar `__attribute__((aligned(8)))` o `aligned(16)` según
+> corresponda.
+
+**Aplicación actual:**
+
+- `task_t`: `__attribute__((aligned(16)))`
+- `ipc_message_t`: `__attribute__((aligned(8)))`
+- `ipc_endpoint_t`: `__attribute__((aligned(16)))`
+- `task_context_t`: alineación natural (todos los campos son `uint64_t`)
+
+**Verificado:** tres Alignment faults resueltos con esta regla:
+1. `g_endpoints` en `ipc_init` (`ipc_endpoint_t` sin alinear).
+2. `task_entry_point` accediendo a `t->entry` desalineado.
+3. `task_a` escribiendo un `ipc_message_t` en el stack con `stur x8`.
+
+**Cómo diagnosticar:**
+
+1. El handler de excepciones imprime `ESR_EL1` y `FAR_EL1`.
+2. Si `ESR_EL1` tiene EC = 0x25 (Data Abort) y DFSC = 0x21 (Alignment
+   fault), es un problema de alineación.
+3. `FAR_EL1` indica la dirección del acceso fallido.
+4. `llvm-objdump -d` en `ELR_EL1` muestra la instrucción concreta.
