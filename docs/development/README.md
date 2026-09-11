@@ -80,3 +80,29 @@ de x86, donde `div` con divisor 0 genera `#DE`.
 
 Para provocar una excepción síncrona de prueba, usar `brk #N` (breakpoint),
 `udf #N` (undefined instruction), o acceder a memoria no mapeada.
+
+## Regla sobre contexto de registros en handlers
+
+Todo handler de excepción o interrupción **debe guardar y restaurar el
+contexto completo de registros** (x0-x30 en aarch64) antes de retornar.
+
+**Verificado:** un handler que guardaba solo x1-x4 y LR corrompía los
+registros x0, x5-x28 del código interrumpido, causando cuelgues
+inexplicables.
+
+**Estructura mínima del stub:**
+- Reservar espacio en el stack (272 bytes = 17 × 16).
+- Guardar x0-x30 con `stp` en pares.
+- Leer system registers (ESR_EL1, ELR_EL1, FAR_EL1, SPSR_EL1).
+- Llamar a la función C del handler.
+- Restaurar x0-x30.
+- Retornar con `eret`.
+
+**Nota sobre `eret`:** después de `eret`, la CPU vuelve a `ELR_EL1` con
+el estado en `SPSR_EL1`. Para que esto funcione correctamente, los
+system registers deben haberse preservado (no modificados por el handler).
+
+**Handlers no recuperables:** si la excepción no es recuperable (por
+ejemplo, un `brk` inesperado), el handler puede decidir no retornar y
+quedarse en bucle infinito. Esto es válido pero debe ser una decisión
+consciente.
