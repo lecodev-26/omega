@@ -1,11 +1,12 @@
 /*
  * OMEGA — Kernel
- * ipc.c — Comunicación entre tareas
+ * ipc.c — Comunicación entre tareas (con capabilities)
  */
 
 #include <stddef.h>
 #include "omega/ipc.h"
 #include "omega/task.h"
+#include "omega/cap.h"
 
 typedef struct {
     ipc_message_t messages[IPC_QUEUE_SIZE];
@@ -15,10 +16,6 @@ typedef struct {
     uint32_t      valid;
 } ipc_endpoint_t;
 
-/*
- * Forzar alineación a 16 bytes para que el compilador no genere
- * stp (store pair) a direcciones no alineadas a 16 bytes.
- */
 static ipc_endpoint_t g_endpoints[IPC_MAX_ENDPOINTS] __attribute__((aligned(16)));
 
 void ipc_init(void) {
@@ -38,9 +35,20 @@ void ipc_register_endpoint(uint32_t idx) {
     g_endpoints[idx].valid = 1;
 }
 
+/*
+ * Envía un mensaje al endpoint destino.
+ *
+ * REQUIERE que la tarea actual tenga una capability que designe
+ * el endpoint destino con CAP_RIGHT_WRITE.
+ */
 int ipc_send(uint32_t target_endpoint, const ipc_message_t *msg) {
     if (target_endpoint >= IPC_MAX_ENDPOINTS) return -1;
     if (msg == NULL) return -1;
+
+    /* Verificar capability */
+    if (cap_lookup((uint64_t)target_endpoint, CAP_RIGHT_WRITE) < 0) {
+        return -1;  /* Sin capability → denegado */
+    }
 
     ipc_endpoint_t *ep = &g_endpoints[target_endpoint];
     if (!ep->valid) return -1;

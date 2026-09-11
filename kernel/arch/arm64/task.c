@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include "omega/task.h"
 #include "omega/ipc.h"
+#include "omega/cap.h"
 #include "omega/uart.h"
 
 /* Importados de switch.S */
@@ -75,6 +76,7 @@ int task_create(const char *name, void (*entry)(void)) {
 
     /* Registrar endpoint IPC para esta tarea */
     ipc_register_endpoint((uint32_t)idx);
+    cap_table_init((uint32_t)idx);
 
     return idx;
 }
