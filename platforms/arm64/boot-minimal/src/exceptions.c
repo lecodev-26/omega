@@ -5,6 +5,15 @@ static omega_exception_info_t g_last_info;
 
 extern void exceptions_install(void);
 
+static void uart_puthex64(uint64_t v) {
+    uart_puts("0x");
+    for (int i = 60; i >= 0; i -= 4) {
+        uint32_t nib = (uint32_t)((v >> i) & 0xF);
+        char c = (nib < 10) ? (char)('0' + nib) : (char)('a' + nib - 10);
+        uart_putc(c);
+    }
+}
+
 void exceptions_init(void) {
     g_last_info.class = OMEGA_EXC_NONE;
     g_last_info.esr_el1 = 0;
@@ -30,11 +39,26 @@ void exception_handler_c(omega_exception_class_t class,
     g_last_info.spsr_el1 = spsr_el1;
 
     uart_puts("\n[EXCEPTION]\n");
+    uart_puts("  class: ");
     switch (class) {
-        case OMEGA_EXC_SYNC:   uart_puts("  class: SYNC\n");   break;
-        case OMEGA_EXC_IRQ:    uart_puts("  class: IRQ\n");    break;
-        case OMEGA_EXC_FIQ:    uart_puts("  class: FIQ\n");    break;
-        case OMEGA_EXC_SERROR: uart_puts("  class: SERROR\n"); break;
-        default:               uart_puts("  class: ?\n");      break;
+        case OMEGA_EXC_SYNC:   uart_puts("SYNC\n");   break;
+        case OMEGA_EXC_IRQ:    uart_puts("IRQ\n");    break;
+        case OMEGA_EXC_FIQ:    uart_puts("FIQ\n");    break;
+        case OMEGA_EXC_SERROR: uart_puts("SERROR\n"); break;
+        default:               uart_puts("?\n");      break;
     }
+    uart_puts("  ESR_EL1:  "); uart_puthex64(esr_el1);  uart_puts("\n");
+    uart_puts("  ELR_EL1:  "); uart_puthex64(elr_el1);  uart_puts("\n");
+    uart_puts("  FAR_EL1:  "); uart_puthex64(far_el1);  uart_puts("\n");
+    uart_puts("  SPSR_EL1: "); uart_puthex64(spsr_el1); uart_puts("\n");
+    uart_puts("[fin excepcion]\n");
+}
+
+void exceptions_print_last(void) {
+    omega_exception_info_t *info = &g_last_info;
+    if (info->class == OMEGA_EXC_NONE) {
+        uart_puts("No hay excepciones registradas.\n");
+        return;
+    }
+    uart_puts("Ultima excepcion registrada.\n");
 }
