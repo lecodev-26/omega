@@ -1,7 +1,4 @@
 # OMEGA — Kernel Makefile
-#
-# Este es el Makefile del kernel OMEGA (prototipo).
-# Compila para aarch64-unknown-none y corre en QEMU virt.
 
 CC      := clang
 LD      := ld.lld
@@ -14,13 +11,15 @@ LDFLAGS := -T linker.ld
 
 BUILD_DIR := build
 
-# Fuentes del kernel
-ASM_SRCS := arch/arm64/boot.S arch/arm64/exceptions_asm.S
+ASM_SRCS := arch/arm64/boot.S \
+            arch/arm64/exceptions_asm.S \
+            arch/arm64/switch.S
 C_SRCS   := kmain.c \
             arch/arm64/uart.c \
             arch/arm64/exceptions.c \
             arch/arm64/timer.c \
-            arch/arm64/gic.c
+            arch/arm64/gic.c \
+            arch/arm64/task.c
 
 ASM_OBJS := $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
 C_OBJS   := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS))
