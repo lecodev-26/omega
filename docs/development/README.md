@@ -230,3 +230,24 @@ Limitaciones:
 · No hay revocación en cascada de las capabilities pasadas.
 · Solo se puede adjuntar UNA capability por mensaje.
   EOF
+
+## Regla sobre contexto extendido de tareas
+
+El `task_context_t` extendido contiene x0-x30 + SP + PC + SPSR. Este es
+el contexto necesario para reanudar una tarea interrumpida por IRQ.
+
+**Layout (offsets en bytes):**
+- 0..240: x[0]..x[30] (31 registros de 8 bytes)
+- 248: sp
+- 256: pc (ELR_EL1)
+- 264: spsr
+
+**Uso cooperativo actual:** Solo se guardan/restauran los callee-saved
+(x19-x30) + SP + PC. El resto no se toca.
+
+**Uso preemptivo (preparado, no activado):** El stub de excepción
+guarda x0-x30 completo en el stack de la tarea. El cambio de contexto
+desde IRQ lee/escribe el contexto extendido completo.
+
+**Verificado:** el kernel prototype compila y funciona con el contexto
+extendido, manteniendo la multitarea cooperativa.

@@ -19,6 +19,7 @@ El kernel prototype **funciona** y soporta:
 - ✅ IPC básico (endpoints + mensajes)
 - ✅ Capabilities (object capabilities para endpoints)
 - ✅ Paso de capabilities en mensajes IPC
+- 🟡 Contexto extendido preparado para preemption
 
 ## Qué NO hace todavía
 
