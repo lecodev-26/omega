@@ -20,7 +20,7 @@
 | Kernel prototype — multitarea cooperativa | ✅ Verificado |
 | Kernel prototype — IPC básico | ✅ Verificado |
 | Kernel prototype — capabilities | ✅ Verificado |
-| Kernel prototype — paso de cap en mensajes | ✅ Verificado |
+|  Kernel prototype — paso de cap en mensajes | ✅ Verificado |
 | Kernel prototype — preemption con timer | ⏳ Pendiente |
 | Kernel prototype — MMU | ❌ No iniciado |
 | Kernel prototype — user space | ❌ No iniciado |
@@ -41,7 +41,7 @@
 - **M5.1 — IPC básico** ✅
 - **M5.2 — Capabilities** ✅
 - **M5.3 — Paso de cap en mensajes IPC** ✅
-- M6 — Preemption con timer
+- M6 — Preemption con timer (18a completado, 18b pendiente)
 - M7 — MMU + memoria virtual
 - M8 — User space
 - M9 — Drivers
