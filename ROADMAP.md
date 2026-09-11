@@ -15,29 +15,31 @@
 | ARM64 build (nativo) | ✅ Verificado |
 | Bare-metal boot en QEMU | ✅ Verificado |
 | UART funcional | ✅ Verificado |
-| Salida controlada por UART | ✅ Verificado |
 | Vector table + excepciones | ✅ Verificado |
-| Handler detallado | ✅ Verificado |
 | ARM Generic Timer (polling) | ✅ Verificado |
-| GIC + IRQ real | ⏳ Pendiente |
-| Hardware real | ❌ No disponible |
+| GIC + IRQ real | ✅ Verificado |
+| Timer periódico con IRQ | ✅ Verificado |
+| MMU | ❌ No iniciado |
+| Scheduler | ❌ No iniciado |
 | Kernel OMEGA | ❌ No iniciado |
+| Hardware real | ❌ No disponible |
 
 ## Milestones
 
 - **M0 — Repositorio** ✅
 - **M1 — Especificación arquitectónica** (parcial: ADR-0001)
-- **M2 — Prototipo host** ✅ (host prototype v3)
+- **M2 — Prototipo host** ✅
 - **M3 — Build ARM64** ✅
 - **M4 — Boot en QEMU** ✅
 - **M4.1 — UART + salida controlada** ✅
 - **M4.2 — Vector table + excepciones** ✅
 - **M4.3 — ARM Generic Timer (polling)** ✅
-- M5 — Boot en hardware real
-- M6 — GIC + interrupciones reales
+- **M4.4 — GIC + IRQ real** ✅
+- M5 — MMU + memoria virtual
+- M6 — Scheduler básico
 - M7 — IPC en kernel
 - M8 — Primer servicio en user space
-- M9 — Servicios de memoria
+- M9 — Boot en hardware real
 - M10 — Drivers
 - M11 — Sistema de archivos
 - M12 — Red
