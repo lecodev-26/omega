@@ -18,7 +18,6 @@ void uart_init(void) {
 }
 
 void uart_putc(char c) {
-    /* Esperar a que el FIFO de transmisión no esté lleno */
     while (mmio_read(UART_FR) & UART_FR_TXFF) {
         /* spin */
     }
@@ -29,4 +28,11 @@ void uart_puts(const char *s) {
     while (*s) {
         uart_putc(*s++);
     }
+}
+
+char uart_getc(void) {
+    while (mmio_read(UART_FR) & UART_FR_RXFE) {
+        /* spin */
+    }
+    return (char)(mmio_read(UART_DR) & 0xFF);
 }
