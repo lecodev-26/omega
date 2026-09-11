@@ -1,15 +1,20 @@
 /*
- * OMEGA — Boot minimal
- * exceptions_asm.S — Vector table aarch64 (full context save)
+ * OMEGA — Kernel
+ * exceptions_asm.S — Vector table aarch64 (preemptiva)
+ *
+ * Guarda x0-x30 en el stack de la tarea antes de llamar a C.
+ * Al retornar, si el scheduler cambió de tarea, hace context switch.
  */
 
 .section .text.exceptions
 .global exceptions_install
 .global vector_table
+.global exception_return_to_task
 
 .align 11
 
 vector_table:
+    /* Current EL with SP0 */
     .align 7
     b exc_stub_sync
     .align 7
@@ -19,6 +24,7 @@ vector_table:
     .align 7
     b exc_stub_serror
 
+    /* Current EL with SPx */
     .align 7
     b exc_stub_sync
     .align 7
@@ -28,6 +34,7 @@ vector_table:
     .align 7
     b exc_stub_serror
 
+    /* Lower EL using AArch64 */
     .align 7
     b exc_stub_sync
     .align 7
@@ -37,6 +44,7 @@ vector_table:
     .align 7
     b exc_stub_serror
 
+    /* Lower EL using AArch32 */
     .align 7
     b exc_stub_sync
     .align 7
@@ -69,14 +77,18 @@ exc_stub_serror:
     b exc_stub_common
 
 /*
- * Stub común: guarda TODOS los registros x0-x30 antes de llamar a C.
- * Reservamos 256 bytes en el stack para x0-x30 + LR + padding.
+ * Stub común.
+ *
+ * Al entrar, sp apunta al stack de la tarea interrumpida.
+ * Guardamos x0-x30 en ese stack.
+ *
+ * Después de llamar a C, si C decide cambiar de tarea, hace el
+ * cambio de contexto directamente (modifica sp, ELR, SPSR).
  */
 exc_stub_common:
-    /* Reservar 272 bytes (17 * 16 = 272, alineado a 16) */
-    sub sp, sp, #272
+    /* Reservar 256 bytes (32 * 8) para x0-x30 + padding */
+    sub sp, sp, #256
 
-    /* Guardar x0-x30 */
     stp x0, x1, [sp, #0]
     stp x2, x3, [sp, #16]
     stp x4, x5, [sp, #32]
@@ -95,20 +107,31 @@ exc_stub_common:
     str x30, [sp, #240]
 
     /*
-     * Ahora x0 sigue conteniendo el class_id original (no se ha modificado
-     * porque lo guardamos en el stack y solo guardamos, no sobrescribimos).
-     *
-     * Leer system registers a x1-x4.
+     * x0 contenía el class_id. Lo guardamos en x19 para
+     * pasarlo después de leer system registers.
      */
-    mrs x1, esr_el1
-    mrs x2, elr_el1
-    mrs x3, far_el1
-    mrs x4, spsr_el1
+    mov x19, x0
 
-    /* Llamar a exception_handler_c(x0, x1, x2, x3, x4) */
+    mrs x0, esr_el1
+    mrs x1, elr_el1
+    mrs x2, far_el1
+    mrs x3, spsr_el1
+
+    /* exception_handler_c(class, esr, elr, far, spsr) */
+    /* x0=class, x1=esr, x2=elr, x3=far, x4=spsr */
+    mov x4, x3     /* spsr */
+    mov x3, x2     /* far */
+    mov x2, x1     /* elr */
+    mov x1, x0     /* esr */
+    mov x0, x19    /* class */
     bl exception_handler_c
 
-    /* Restaurar x0-x30 */
+    /*
+     * Después de C, sp puede haber cambiado si C hizo un context switch
+     * (C puede haber modificado g_current y sp en el stack).
+     *
+     * Restauramos x0-x30 del stack actual.
+     */
     ldp x0, x1, [sp, #0]
     ldp x2, x3, [sp, #16]
     ldp x4, x5, [sp, #32]
@@ -126,7 +149,5 @@ exc_stub_common:
     ldp x28, x29, [sp, #224]
     ldr x30, [sp, #240]
 
-    add sp, sp, #272
-
-    /* Return from exception: eret vuelve a ELR_EL1 */
+    add sp, sp, #256
     eret
