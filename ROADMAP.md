@@ -19,16 +19,16 @@
 | Kernel prototype — IRQs reales | ✅ Verificado |
 | Kernel prototype — multitarea cooperativa | ✅ Verificado |
 | Kernel prototype — IPC básico | ✅ Verificado |
+| Kernel prototype — capabilities | ✅ Verificado |
 | Kernel prototype — preemption con timer | ⏳ Pendiente |
 | Kernel prototype — MMU | ❌ No iniciado |
-| Kernel prototype — capabilities | ❌ No iniciado |
 | Kernel prototype — user space | ❌ No iniciado |
 | Hardware real | ❌ No disponible |
 
 ## Milestones
 
 - **M0 — Repositorio** ✅
-- **M1 — Especificación arquitectónica** (parcial: ADR-0001)
+- **M1 — Especificación arquitectónica** (parcial: ADR-0001, ADR-0002)
 - **M2 — Prototipo host** ✅
 - **M3 — Build ARM64** ✅
 - **M4 — Boot en QEMU** ✅
@@ -38,16 +38,16 @@
 - **M4.4 — GIC + IRQ real** ✅
 - **M5 — Multitarea cooperativa** ✅
 - **M5.1 — IPC básico** ✅
+- **M5.2 — Capabilities** ✅
 - M6 — Preemption con timer
 - M7 — MMU + memoria virtual
-- M8 — Capabilities
-- M9 — User space
-- M10 — Drivers
-- M11 — Boot en hardware real
-- M12 — Sistema de archivos
-- M13 — Red
-- M14 — Validación de seguridad
-- M15 — SO experimental usable
+- M8 — User space
+- M9 — Drivers
+- M10 — Boot en hardware real
+- M11 — Sistema de archivos
+- M12 — Red
+- M13 — Validación de seguridad
+- M14 — SO experimental usable
 
 ## Lo que NO se hace ahora
 
