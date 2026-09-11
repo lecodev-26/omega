@@ -194,3 +194,39 @@ destino no puede enviar.
 - Añadir paso de capabilities en mensajes IPC.
 - Añadir capabilities de memoria (cuando haya MMU).
 - Añadir revocación en cascada.
+
+## Regla sobre paso de capabilities en mensajes
+
+El paso de capabilities entre tareas en el kernel prototype sigue
+el **principio de no incremento de derechos**:
+
+1. Una tarea solo puede adjuntar una capability a un mensaje si tiene
+   `CAP_RIGHT_GRANT` sobre ella.
+2. La capability recibida **NO incluye** `CAP_RIGHT_GRANT` (no se propaga
+   por defecto).
+3. La capability recibida tiene los mismos derechos que tenía el emisor
+   (menos GRANT).
+
+**API:**
+
+```c
+ipc_send_with_cap(endpoint, msg, sender_cap_idx);
+```
+
+· sender_cap_idx es el índice en la tabla del emisor.
+· Al recibir, la capability se añade automáticamente a la tabla del
+  receptor (si hay espacio).
+· Si no hay espacio en la tabla del receptor, el mensaje se recibe
+  sin la capability (con has_cap = 0).
+
+Verificado: una tarea A envía a B una capability al objeto 5 con
+derechos READ|GRANT. B la recibe. B puede usar cap_lookup(5, READ).
+B no puede usar cap_lookup(5, GRANT) (GRANT no se propagó).
+
+Limitaciones:
+
+· No hay paso por referencia.
+· No hay "reply capabilities" (a diferencia de seL4).
+· No hay revocación en cascada de las capabilities pasadas.
+· Solo se puede adjuntar UNA capability por mensaje.
+  EOF
