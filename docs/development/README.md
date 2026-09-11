@@ -29,3 +29,31 @@ printf -- '- item\n'  # OK
 ```
 
 Esta regla se aplica siempre que el string a imprimir empiece por -.
+
+## Regla sobre linker bare-metal en Termux
+
+`clang` en Termux tiene problemas invocando el linker para targets
+bare-metal (`aarch64-unknown-none`). El error es que intenta invocar
+`/data/data/com.termux/files/usr/bin/false` en lugar del linker real.
+
+**Solución adoptada:** invocar `ld.lld` directamente en el Makefile,
+sin `clang` como driver del linker.
+
+Ejemplo:
+
+```makefile
+CC := clang
+LD := ld.lld
+
+TARGET  := aarch64-unknown-none
+CFLAGS  := --target=$(TARGET) -ffreestanding -fno-stack-protector
+LDFLAGS := -T linker.ld
+
+$(BIN): $(OBJS)
+$(LD) $(LDFLAGS) $^ -o $@
+```
+
+Nota: ld.lld no acepta --target. El target lo determina a partir
+de los objetos de entrada.
+
+Verificado: compila y bootea en QEMU virt aarch64.
