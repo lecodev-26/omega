@@ -4,15 +4,21 @@ CC      := clang
 LD      := ld.lld
 OBJCOPY := llvm-objcopy
 
-# Target bare-metal aarch64
 TARGET  := aarch64-unknown-none
-CFLAGS  := --target=$(TARGET) -std=c11 -Wall -Wextra -O2 -ffreestanding -fno-stack-protector -Iinclude
+# -mgeneral-regs-only: prohibido usar FP/SIMD (no estan habilitados por defecto)
+CFLAGS  := --target=$(TARGET) -std=c11 -Wall -Wextra -O2 -ffreestanding \
+           -fno-stack-protector -mgeneral-regs-only -Iinclude
 LDFLAGS := -T linker.ld
 
 SRC_DIR   := src
 BUILD_DIR := build
 
-OBJS := $(BUILD_DIR)/boot.o $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(wildcard $(SRC_DIR)/*.c))
+ASM_SRCS := boot.S exceptions_asm.S
+C_SRCS   := kmain.c uart.c exceptions.c
+
+ASM_OBJS := $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
+C_OBJS   := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS))
+OBJS     := $(ASM_OBJS) $(C_OBJS)
 
 BIN     := $(BUILD_DIR)/omega-boot.elf
 BIN_RAW := $(BUILD_DIR)/omega-boot.bin
@@ -24,7 +30,7 @@ all: $(BIN) $(BIN_RAW)
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
-$(BUILD_DIR)/boot.o: $(SRC_DIR)/boot.S | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.S | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)

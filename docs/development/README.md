@@ -57,3 +57,26 @@ Nota: ld.lld no acepta --target. El target lo determina a partir
 de los objetos de entrada.
 
 Verificado: compila y bootea en QEMU virt aarch64.
+
+## Regla sobre FP/SIMD en bare-metal aarch64
+
+En bare-metal aarch64, el acceso a registros FP/SIMD (registros `v0`-`v31`,
+`s0`-`s31`, `d0`-`d31`, `q0`-`q31`) está deshabilitado por defecto en
+`CPACR_EL1.FPEN`. Si el compilador genera instrucciones SIMD (por ejemplo,
+`movi v0.2d, #0`), se produce una excepción no manejable que cuelga el
+sistema.
+
+**Solución:** compilar con `-mgeneral-regs-only`, que instruye al compilador
+para no usar FP/SIMD.
+
+**Verificado:** el cuelgue de `exceptions_init` se debía a una instrucción
+`movi v0.2d, #0` generada por clang al agrupar inicializaciones.
+
+## Regla sobre división por cero en ARMv8-A
+
+En ARMv8-A, las instrucciones `sdiv` y `udiv` **NO generan excepción** cuando
+el divisor es 0. Devuelven 0 como resultado (según ARM ARM). Esto es diferente
+de x86, donde `div` con divisor 0 genera `#DE`.
+
+Para provocar una excepción síncrona de prueba, usar `brk #N` (breakpoint),
+`udf #N` (undefined instruction), o acceder a memoria no mapeada.
