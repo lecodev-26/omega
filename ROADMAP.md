@@ -8,21 +8,23 @@
 | Requisitos y propiedades verificables | ✅ Congelado |
 | Diseño experimental (R2) | ✅ Congelado |
 | Piloto 1 — protocolo | ✅ Cerrado como propuesta |
-| Repositorio | ⏳ En construcción |
-| Toolchain | ⏳ Pendiente |
-| Prototipo host | ⏳ Pendiente |
-| ARM64 build | ⏳ Pendiente |
-| QEMU boot | ⏳ Pendiente |
+| Repositorio | ✅ Creado |
+| Documentación estructurada | ✅ Creada |
+| Host prototype v3 | ✅ Funcional |
+| Simulación host Piloto 1 | ✅ Funcional |
+| ARM64 build (nativo) | ✅ Verificado |
+| Bare-metal boot en QEMU | ✅ Verificado |
+| Toolchain bare-metal | ✅ Verificado |
 | Hardware real | ❌ No disponible |
 | Kernel OMEGA | ❌ No iniciado |
 
 ## Milestones
 
-- **M0 — Repositorio** (actual)
-- M1 — Especificación arquitectónica
-- M2 — Prototipo host
-- M3 — Build ARM64
-- M4 — Boot en QEMU
+- **M0 — Repositorio** ✅
+- **M1 — Especificación arquitectónica** (parcial: ADR-0001)
+- **M2 — Prototipo host** ✅ (host prototype v3)
+- **M3 — Build ARM64** ✅
+- **M4 — Boot en QEMU** ✅ (bare-metal minimal)
 - M5 — Boot en hardware real
 - M6 — IPC en kernel
 - M7 — Primer servicio en user space
