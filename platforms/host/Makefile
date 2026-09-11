@@ -6,6 +6,10 @@ CC      ?= clang
 CFLAGS  := -std=c11 -Wall -Wextra -Wpedantic -O2 -Iinclude
 LDFLAGS :=
 
+# === ARM64 / aarch64 ===
+ARCH ?= native
+ARM64_CFLAGS := -march=armv8-a -mtune=cortex-a53
+
 SRC_DIR   := src
 TEST_DIR  := tests
 BUILD_DIR := build
@@ -22,9 +26,14 @@ BIN := $(BUILD_DIR)/omega-host
 TEST_SRCS := $(wildcard $(TEST_DIR)/*.c)
 TEST_BINS := $(patsubst $(TEST_DIR)/%.c,$(BUILD_DIR)/%,$(TEST_SRCS))
 
-.PHONY: all test clean run
+.PHONY: all test clean run arm64
 
 all: $(BIN)
+
+arm64: CFLAGS += $(ARM64_CFLAGS)
+arm64: clean all
+	@echo "=== ARM64 build ==="
+	@file $(BIN)
 
 $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
