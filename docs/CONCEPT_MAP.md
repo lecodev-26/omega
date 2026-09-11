@@ -38,3 +38,11 @@ y dónde está la documentación correspondiente.
 ## Principio rector
 
 > Conocer → comparar → experimentar → decidir → construir.
+
+## ADRs
+
+| ADR | Título | Estado |
+|-----|--------|--------|
+| ADR-0001 | Fundación del kernel | Propuesto |
+| ADR-0002 | Kernel prototype | Aceptado |
+| ADR-0003 | Scheduler | Parcialmente aceptado |
