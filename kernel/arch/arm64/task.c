@@ -1,6 +1,6 @@
 /*
  * OMEGA — Kernel
- * task.c — Tareas y scheduler (preparado para preemption)
+ * task.c — Tareas y scheduler (preemptivo)
  */
 
 #include <stddef.h>
@@ -72,9 +72,6 @@ int task_create(const char *name, void (*entry)(void)) {
      *     bits [3:0] = 0101 → EL1h (SP_EL1)
      *     bit  [4]   = 0    → AArch64
      *     bits [9:6] = 1100 → D=1, A=1, I=0, F=0
-     *
-     * Esto es CRÍTICO: si I=1, la tarea arranca con IRQs
-     * enmascaradas y el timer nunca interrumpe.
      */
     t->context.spsr = 0x305;
 
@@ -98,15 +95,6 @@ int task_create(const char *name, void (*entry)(void)) {
 }
 
 void task_entry_point(task_t *t) {
-    if (t && t->entry) {
-        t->entry();
-    }
-}
-
-void task_entry_point_diag(task_t *t) {
-    uart_puts("[tep:");
-    uart_puthex64((uint64_t)t);
-    uart_puts("]");
     if (t && t->entry) {
         t->entry();
     }
@@ -229,36 +217,4 @@ void task_tick_from_irq(void) {
     g_tasks[next].state = TASK_STATE_RUNNING;
     g_current = next;
     g_preempt_next_idx = next;
-}
-
-void task_tick_from_irq_diag(void) {
-    uart_puts("[tick]");
-    task_tick_from_irq();
-    if (g_preempt_next_idx >= 0) {
-        uart_puts("[will switch to ");
-        uart_putdec32((uint32_t)g_preempt_next_idx);
-        uart_puts("]");
-    } else {
-        uart_puts("[no switch]");
-    }
-}
-
-void task_tick_from_irq_diag2(void) {
-    uart_puts("[tick]");
-    task_tick_from_irq();
-    if (g_preempt_next_idx >= 0) {
-        uart_puts("[will switch to ");
-        uart_putdec32((uint32_t)g_preempt_next_idx);
-        uart_puts("]");
-        task_t *t = &g_tasks[g_preempt_next_idx];
-        uart_puts("[pc=");
-        uart_puthex64(t->context.pc);
-        uart_puts(" sp=");
-        uart_puthex64(t->context.sp);
-        uart_puts(" spsr=");
-        uart_puthex64(t->context.spsr);
-        uart_puts("]");
-    } else {
-        uart_puts("[no switch]");
-    }
 }

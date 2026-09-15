@@ -1,6 +1,6 @@
 /*
  * OMEGA — Kernel
- * task.h — Tareas y scheduler (preparado para preemption)
+ * task.h — Tareas y scheduler (preemptivo)
  */
 
 #ifndef OMEGA_TASK_H
@@ -62,16 +62,12 @@ void task_entry_point(task_t *t);
  */
 void task_finished(void);
 
-#endif /* OMEGA_TASK_H */
-
 /*
  * Índice de la tarea a la que hay que cambiar en el próximo retorno
  * de IRQ. -1 significa "no cambiar".
- *
- * Usado por el stub de IRQ. El handler C lo actualiza, el assembly
- * lo consulta.
  */
 extern int g_preempt_next_idx;
+extern int g_preempt_from_idx;
 
 /*
  * Maneja el tick del timer desde el handler de IRQ.
@@ -89,37 +85,4 @@ task_context_t *task_context_of(int idx);
  */
 void task_set_current(int idx);
 
-
-/*
- * Variables globales para el cambio de contexto desde IRQ.
- *
- * g_preempt_from_idx: índice de la tarea interrumpida.
- * g_preempt_next_idx: índice de la tarea a la que cambiar (-1 = no cambiar).
- *
- * El handler C actualiza g_preempt_next_idx. El assembly lo consulta
- * al retornar del handler.
- */
-extern int g_preempt_from_idx;
-extern int g_preempt_next_idx;
-
-/*
- * Contexto de la tarea en el índice dado (para el assembly).
- */
-task_context_t *task_context_of(int idx);
-
-
-/*
- * Llamado desde el handler de IRQ. Decide si cambiar de tarea.
- * Actualiza g_preempt_from_idx y g_preempt_next_idx.
- */
-void task_tick_from_irq(void);
-
-
-void task_tick_from_irq_diag(void);
-
-
-void task_tick_from_irq_diag2(void);
-
-
-void task_entry_point_diag(task_t *t);
-
+#endif /* OMEGA_TASK_H */

@@ -81,7 +81,7 @@ task_start_first:
 .global task_trampoline
 task_trampoline:
     mov x0, x19
-    bl task_entry_point_diag
+    bl task_entry_point
     bl task_finished
 1:
     wfe
@@ -198,8 +198,6 @@ context_switch_from_irq:
 
     /* --- Cargar x0-x30 del stack a los registros --- */
     ldp x0, x1, [sp, #0]
-    /* Nota: NO cargamos x2, x3 todavía porque los usamos */
-    /* Los cargamos al final */
     ldp x4, x5, [sp, #32]
     ldp x6, x7, [sp, #48]
     ldp x8, x9, [sp, #64]
@@ -214,8 +212,6 @@ context_switch_from_irq:
     ldp x26, x27, [sp, #208]
     ldp x28, x29, [sp, #224]
     ldr x30, [sp, #240]
-
-    /* Cargar x2, x3 al final */
     ldp x2, x3, [sp, #16]
 
     /* Ajustar SP al SP original de la tarea */
