@@ -42,6 +42,7 @@ Estado
 | [0002](ADR-0002-kernel-prototype.md) | Kernel prototype — Decisiones de arquitectura | Aceptado |
 | [0003](ADR-0003-scheduler.md) | Modelo de scheduler | Aceptado |
 | [0004](ADR-0004-preemption-timer.md) | Preemption con timer | Aceptado |
+| [0005](ADR-0005-ipc-blocking.md) | IPC blocking | Aceptado |
 
 ## ADRs pendientes
 

@@ -22,6 +22,7 @@
 | Kernel prototype — capabilities | ✅ Verificado |
 | Kernel prototype — paso de cap en mensajes | ✅ Verificado |
 | Kernel prototype — preemption con timer | ✅ Verificado |
+| Kernel prototype — IPC blocking | ✅ Verificado |
 | Kernel prototype — MMU | ❌ No iniciado |
 | Kernel prototype — user space | ❌ No iniciado |
 | Hardware real | ❌ No disponible |
@@ -29,7 +30,7 @@
 ## Milestones
 
 - **M0 — Repositorio** ✅
-- **M1 — Especificación arquitectónica** (parcial: ADR-0001, ADR-0002, ADR-0003, ADR-0004)
+- **M1 — Especificación arquitectónica** (parcial: ADR-0001..0005)
 - **M2 — Prototipo host** ✅
 - **M3 — Build ARM64** ✅
 - **M4 — Boot en QEMU** ✅
@@ -42,6 +43,7 @@
 - **M5.2 — Capabilities** ✅
 - **M5.3 — Paso de cap en mensajes IPC** ✅
 - **M6 — Preemption con timer** ✅
+- **M6.1 — IPC blocking** ✅
 - **M7 — MMU + memoria virtual** ❌ No iniciado
 - **M8 — User space** ❌ No iniciado
 - **M9 — Drivers** ❌ No iniciado

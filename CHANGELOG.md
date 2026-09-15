@@ -17,6 +17,7 @@
   - Capabilities (object capabilities para endpoints IPC).
   - Paso de capabilities en mensajes IPC.
   - Preemption con timer (cambio de contexto desde IRQ).
+  - IPC blocking (send/recv esperan si el buzón está lleno/vacío).
 - Documentación:
   - 19 documentos conceptuales (0.1.0–0.1.18).
   - Requisitos y propiedades verificables (R1-FINAL).
@@ -26,21 +27,23 @@
   - ADR-0002: Kernel prototype.
   - ADR-0003: Modelo de scheduler.
   - ADR-0004: Preemption con timer.
+  - ADR-0005: IPC blocking.
   - Documento de brecha conceptual.
 
 ### Fixed
 - `SPSR` de tareas nuevas: `0x305` (I=0) en lugar de `0x3C5` (I=1).
-  Sin esto, las tareas arrancaban con IRQs enmascaradas y el timer
-  nunca interrumpía.
 - Stack de tareas nuevas: preparar marco de 256 bytes con x0-x30
-  en `task_create`. Sin esto, `context_switch_from_irq` cargaba
-  basura en `x19` al cambiar a una tarea nueva.
+  en `task_create`.
 - Doble llamada a `task_tick_from_irq` en `exception_handler_c`.
-  La segunda llamada revertía el cambio de tarea.
+- `g_current` no se actualizaba en `task_yield` (arranque inicial y
+  cambio cooperativo).
+- `task_yield` no era atómico: el timer podía interrumpir en medio
+  del cambio de contexto.
+- `ipc_send`/`ipc_recv` no eran atómicos: el timer podía interrumpir
+  entre `ep->count++` y `task_unblock()`.
 
 ### Notes
 - No hay hardware real disponible todavía.
 - El kernel prototype corre únicamente en QEMU.
 - No hay MMU ni user space todavía.
-- La UART no está sincronizada: puede haber basura ocasional en
-  la salida cuando el timer interrumpe mientras se imprime.
+- La UART usa daif save/restore (IRQs off) en vez de spinlock.
