@@ -1,6 +1,6 @@
 /*
  * OMEGA — Kernel
- * ipc.h — Comunicación entre tareas con capabilities
+ * ipc.h — Comunicación entre tareas con capabilities y blocking
  */
 
 #ifndef OMEGA_IPC_H

@@ -1,6 +1,6 @@
 /*
  * OMEGA — Kernel
- * task.h — Tareas y scheduler (preemptivo)
+ * task.h — Tareas y scheduler (preemptivo, con bloqueo)
  */
 
 #ifndef OMEGA_TASK_H
@@ -16,6 +16,7 @@ typedef enum {
     TASK_STATE_UNUSED = 0,
     TASK_STATE_READY,
     TASK_STATE_RUNNING,
+    TASK_STATE_BLOCKED,    /* esperando un recurso (IPC, etc.) */
     TASK_STATE_FINISHED
 } task_state_t;
 
@@ -61,6 +62,18 @@ void task_entry_point(task_t *t);
  * Llamada cuando una tarea termina (su entry retorna).
  */
 void task_finished(void);
+
+/*
+ * Bloquea la tarea actual (estado BLOCKED) y cede el control.
+ * Retorna cuando la tarea es desbloqueada por otra.
+ */
+void task_block_current(void);
+
+/*
+ * Desbloquea la tarea con el índice dado (si está BLOCKED).
+ * La pone en READY.
+ */
+void task_unblock(int idx);
 
 /*
  * Índice de la tarea a la que hay que cambiar en el próximo retorno

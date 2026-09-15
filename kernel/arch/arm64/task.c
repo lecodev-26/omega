@@ -1,6 +1,6 @@
 /*
  * OMEGA — Kernel
- * task.c — Tareas y scheduler (preemptivo)
+ * task.c — Tareas y scheduler (preemptivo, con bloqueo)
  */
 
 #include <stddef.h>
@@ -64,23 +64,11 @@ int task_create(const char *name, void (*entry)(void)) {
     t->context.sp = sp_top;
 
     t->context.pc = (uint64_t)task_trampoline;
-
-    /*
-     * SPSR: EL1h (0x5) + DAIF con I=0 (IRQs habilitadas).
-     *
-     *   0x305 = 0b11_0000_0101:
-     *     bits [3:0] = 0101 → EL1h (SP_EL1)
-     *     bit  [4]   = 0    → AArch64
-     *     bits [9:6] = 1100 → D=1, A=1, I=0, F=0
-     */
-    t->context.spsr = 0x305;
+    t->context.spsr = 0x305;   /* EL1h, DAIF.I=0 */
 
     t->context.x[19] = (uint64_t)t;
 
-    /*
-     * Preparar el stack de la tarea como si hubiera sido interrumpida:
-     * escribir x0-x30 en el marco de 256 bytes.
-     */
+    /* Preparar el stack de la tarea como si hubiera sido interrumpida */
     uintptr_t frame_sp = sp_top - 256;
     uint64_t *frame = (uint64_t *)frame_sp;
     for (int j = 0; j < 31; j++) {
@@ -112,7 +100,14 @@ void task_finished(void) {
 
 int task_schedule_next(void) {
     if (g_num_tasks == 0) return -1;
-    if (g_num_tasks == 1) return 0;
+    if (g_num_tasks == 1) {
+        /* Solo una tarea: si está RUNNING o READY, devolverla. */
+        if (g_tasks[0].state == TASK_STATE_RUNNING ||
+            g_tasks[0].state == TASK_STATE_READY) {
+            return 0;
+        }
+        return -1;
+    }
 
     int start = (g_current + 1) % g_num_tasks;
     int idx = start;
@@ -134,7 +129,16 @@ void task_yield(void) {
     int prev = g_current;
     int next = task_schedule_next();
 
-    if (next < 0) return;
+    if (next < 0) {
+        /* No hay otra tarea. Si la actual está BLOCKED, es un deadlock. */
+        if (prev >= 0 && g_tasks[prev].state == TASK_STATE_BLOCKED) {
+            uart_puts("[deadlock: no hay tareas listas]\n");
+            for (;;) {
+                __asm__ volatile("wfe");
+            }
+        }
+        return;
+    }
 
     if (prev == next) {
         g_tasks[prev].yields++;
@@ -148,7 +152,9 @@ void task_yield(void) {
         return;
     }
 
-    g_tasks[prev].state = TASK_STATE_READY;
+    if (g_tasks[prev].state == TASK_STATE_RUNNING) {
+        g_tasks[prev].state = TASK_STATE_READY;
+    }
     g_tasks[prev].yields++;
     g_tasks[next].state = TASK_STATE_RUNNING;
     g_tasks[next].yields++;
@@ -177,6 +183,35 @@ task_context_t *task_context_of(int idx) {
 
 void task_set_current(int idx) {
     g_current = idx;
+}
+
+/*
+ * Bloquea la tarea actual y cede el control.
+ *
+ * Retorna cuando la tarea es desbloqueada por otra.
+ */
+void task_block_current(void) {
+    if (g_current < 0) return;
+    g_tasks[g_current].state = TASK_STATE_BLOCKED;
+    task_yield();
+
+    /*
+     * Al retornar, la tarea ha sido desbloqueada (estado READY o RUNNING).
+     * Si el scheduler la volvió a elegir, su estado será RUNNING.
+     */
+    if (g_current >= 0 && g_tasks[g_current].state == TASK_STATE_READY) {
+        g_tasks[g_current].state = TASK_STATE_RUNNING;
+    }
+}
+
+/*
+ * Desbloquea la tarea con el índice dado (si está BLOCKED).
+ */
+void task_unblock(int idx) {
+    if (idx < 0 || idx >= g_num_tasks) return;
+    if (g_tasks[idx].state == TASK_STATE_BLOCKED) {
+        g_tasks[idx].state = TASK_STATE_READY;
+    }
 }
 
 void task_tick_from_irq(void) {
@@ -211,7 +246,7 @@ void task_tick_from_irq(void) {
         return;
     }
 
-    if (prev >= 0) {
+    if (prev >= 0 && g_tasks[prev].state == TASK_STATE_RUNNING) {
         g_tasks[prev].state = TASK_STATE_READY;
     }
     g_tasks[next].state = TASK_STATE_RUNNING;
