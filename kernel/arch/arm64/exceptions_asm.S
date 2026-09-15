@@ -1,15 +1,11 @@
 /*
  * OMEGA — Kernel
- * exceptions_asm.S — Vector table aarch64 (preemptiva)
- *
- * Guarda x0-x30 en el stack de la tarea antes de llamar a C.
- * Al retornar, si el scheduler cambió de tarea, hace context switch.
+ * exceptions_asm.S — Vector table (preemptiva)
  */
 
 .section .text.exceptions
 .global exceptions_install
 .global vector_table
-.global exception_return_to_task
 
 .align 11
 
@@ -81,12 +77,8 @@ exc_stub_serror:
  *
  * Al entrar, sp apunta al stack de la tarea interrumpida.
  * Guardamos x0-x30 en ese stack.
- *
- * Después de llamar a C, si C decide cambiar de tarea, hace el
- * cambio de contexto directamente (modifica sp, ELR, SPSR).
  */
 exc_stub_common:
-    /* Reservar 256 bytes (32 * 8) para x0-x30 + padding */
     sub sp, sp, #256
 
     stp x0, x1, [sp, #0]
@@ -106,32 +98,55 @@ exc_stub_common:
     stp x28, x29, [sp, #224]
     str x30, [sp, #240]
 
-    /*
-     * x0 contenía el class_id. Lo guardamos en x19 para
-     * pasarlo después de leer system registers.
-     */
+    /* Guardar class_id en x19 */
     mov x19, x0
 
+    /* Leer system registers */
     mrs x0, esr_el1
     mrs x1, elr_el1
     mrs x2, far_el1
     mrs x3, spsr_el1
 
     /* exception_handler_c(class, esr, elr, far, spsr) */
-    /* x0=class, x1=esr, x2=elr, x3=far, x4=spsr */
-    mov x4, x3     /* spsr */
-    mov x3, x2     /* far */
-    mov x2, x1     /* elr */
-    mov x1, x0     /* esr */
-    mov x0, x19    /* class */
+    mov x4, x3
+    mov x3, x2
+    mov x2, x1
+    mov x1, x0
+    mov x0, x19
     bl exception_handler_c
 
     /*
-     * Después de C, sp puede haber cambiado si C hizo un context switch
-     * (C puede haber modificado g_current y sp en el stack).
-     *
-     * Restauramos x0-x30 del stack actual.
+     * Verificar si hay cambio de tarea pendiente.
+     * g_preempt_next_idx es una variable global en C.
      */
+    adrp x0, g_preempt_next_idx
+    add  x0, x0, :lo12:g_preempt_next_idx
+    ldr  w1, [x0]
+    cmp  w1, #0
+    b.lt 1f              /* si < 0, retorno normal */
+
+    /* Hay cambio. Llamar a context_switch_from_irq(from, to). */
+
+    /* from = task_context_of(g_preempt_from_idx) */
+    adrp x0, g_preempt_from_idx
+    add  x0, x0, :lo12:g_preempt_from_idx
+    ldr  w0, [x0]
+    bl   task_context_of
+    mov  x19, x0         /* guardar from */
+
+    /* to = task_context_of(g_preempt_next_idx) */
+    adrp x0, g_preempt_next_idx
+    add  x0, x0, :lo12:g_preempt_next_idx
+    ldr  w0, [x0]
+    bl   task_context_of
+    mov  x1, x0          /* x1 = to */
+
+    mov  x0, x19         /* x0 = from */
+    bl   context_switch_from_irq
+    /* Nunca retorna: hace eret */
+
+1:
+    /* Retorno normal: restaurar x0-x30 y eret */
     ldp x0, x1, [sp, #0]
     ldp x2, x3, [sp, #16]
     ldp x4, x5, [sp, #32]

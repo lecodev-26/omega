@@ -18,15 +18,13 @@
 
 /* ============================================================
  * void context_switch(task_context_t *from, task_context_t *to)
- *   x0 = from
- *   x1 = to
  *
  * Cambio de contexto cooperativo: guarda/restaura solo callee-saved
  * (x19-x30), SP y PC.
  * ============================================================ */
 .global context_switch
 context_switch:
-    /* Guardar x19-x30 en `from` (offsets 152..240) */
+    /* Guardar x19-x30 en `from` */
     stp x19, x20, [x0, #152]
     stp x21, x22, [x0, #168]
     stp x23, x24, [x0, #184]
@@ -38,7 +36,7 @@ context_switch:
     mov x2, sp
     str x2, [x0, #248]
 
-    /* Guardar PC (dirección de retorno = x30) */
+    /* Guardar PC */
     str x30, [x0, #256]
 
     /* Cargar x19-x30 de `to` */
@@ -59,10 +57,8 @@ context_switch:
 
 /* ============================================================
  * void task_start_first(task_context_t *to)
- *   x0 = to
  *
- * Arranca una tarea desde cero. Carga su contexto y salta al PC.
- * No retorna.
+ * Arranca una tarea desde cero.
  * ============================================================ */
 .global task_start_first
 task_start_first:
@@ -81,49 +77,36 @@ task_start_first:
 
 /* ============================================================
  * task_trampoline: entrada de tareas nuevas (cooperativo)
- *
- * Al arrancar una tarea nueva, x19 contiene el puntero a la task.
  * ============================================================ */
 .global task_trampoline
 task_trampoline:
     mov x0, x19
-    bl task_entry_point
-
+    bl task_entry_point_diag
     bl task_finished
-
-1:
-    wfe
-    b 1b
-
-/* ============================================================
- * task_trampoline_irq: entrada de tareas nuevas (preemptivo)
- * Reservado para 18b/18c. Por ahora no se usa.
- * ============================================================ */
-.global task_trampoline_irq
-task_trampoline_irq:
-    /* Reservado */
 1:
     wfe
     b 1b
 
 /* ============================================================
  * void context_switch_from_irq(task_context_t *from, task_context_t *to)
- *   x0 = from
- *   x1 = to
  *
- * Se llama desde el stub de IRQ, con sp apuntando al marco
- * de 256 bytes que contiene x0-x30 de la tarea interrumpida.
+ * Cambio de contexto desde el stub de IRQ.
  *
- * Hace el cambio de contexto completo:
- *   - Copia x0-x30 del stack actual a `from`.
- *   - Guarda SP (antes del marco), PC (ELR_EL1), SPSR.
- *   - Copia x0-x30 de `to` al stack actual.
- *   - Cambia SP, ELR_EL1, SPSR_EL1.
- *   - No retorna: hace eret.
+ * Se asume que el SP actual apunta a un marco de 256 bytes que
+ * contiene x0-x30 de la tarea interrumpida (guardados por el stub).
+ *
+ * Flujo:
+ *   1. Copiar x0-x30 del stack a `from->context.x[0..30]`.
+ *   2. Guardar SP (sp + 256), PC (ELR_EL1), SPSR en `from`.
+ *   3. Cambiar SP al marco de `to`.
+ *   4. Cargar PC y SPSR de `to`.
+ *   5. Cargar x0-x30 desde el marco al CPU.
+ *   6. Ajustar SP al SP original de la tarea.
+ *   7. eret.
  * ============================================================ */
 .global context_switch_from_irq
 context_switch_from_irq:
-    /* --- Guardar x0-x30 del stack actual a `from` (offsets 0..240) --- */
+    /* --- Guardar x0-x30 del stack actual a `from` --- */
     ldp x2, x3, [sp, #0]
     stp x2, x3, [x0, #0]
     ldp x2, x3, [sp, #16]
@@ -157,7 +140,7 @@ context_switch_from_irq:
     ldr x2, [sp, #240]
     str x2, [x0, #240]
 
-    /* Guardar SP de la tarea (sp + 256, antes del marco) */
+    /* Guardar SP de la tarea (sp + 256) */
     add x2, sp, #256
     str x2, [x0, #248]
 
@@ -167,7 +150,19 @@ context_switch_from_irq:
     mrs x2, spsr_el1
     str x2, [x0, #264]
 
-    /* --- Cargar x0-x30 de `to` en el stack actual --- */
+    /* --- Cambiar SP al marco de `to` --- */
+    ldr x2, [x1, #248]        // x2 = to->sp
+    sub x2, x2, #256          // x2 = to->sp - 256
+    mov sp, x2
+
+    /* --- Cargar PC y SPSR de `to` --- */
+    ldr x2, [x1, #256]
+    msr elr_el1, x2
+    ldr x2, [x1, #264]
+    msr spsr_el1, x2
+    isb
+
+    /* --- Cargar x0-x30 de `to` en el stack (marco actual) --- */
     ldp x2, x3, [x1, #0]
     stp x2, x3, [sp, #0]
     ldp x2, x3, [x1, #16]
@@ -201,17 +196,30 @@ context_switch_from_irq:
     ldr x2, [x1, #240]
     str x2, [sp, #240]
 
-    /* Cambiar SP: apunta al marco de la nueva tarea */
-    ldr x2, [x1, #248]
-    sub x2, x2, #256
-    mov sp, x2
+    /* --- Cargar x0-x30 del stack a los registros --- */
+    ldp x0, x1, [sp, #0]
+    /* Nota: NO cargamos x2, x3 todavía porque los usamos */
+    /* Los cargamos al final */
+    ldp x4, x5, [sp, #32]
+    ldp x6, x7, [sp, #48]
+    ldp x8, x9, [sp, #64]
+    ldp x10, x11, [sp, #80]
+    ldp x12, x13, [sp, #96]
+    ldp x14, x15, [sp, #112]
+    ldp x16, x17, [sp, #128]
+    ldp x18, x19, [sp, #144]
+    ldp x20, x21, [sp, #160]
+    ldp x22, x23, [sp, #176]
+    ldp x24, x25, [sp, #192]
+    ldp x26, x27, [sp, #208]
+    ldp x28, x29, [sp, #224]
+    ldr x30, [sp, #240]
 
-    /* Cargar PC y SPSR de `to` */
-    ldr x2, [x1, #256]
-    msr elr_el1, x2
-    ldr x2, [x1, #264]
-    msr spsr_el1, x2
+    /* Cargar x2, x3 al final */
+    ldp x2, x3, [sp, #16]
+
+    /* Ajustar SP al SP original de la tarea */
+    add sp, sp, #256
 
     /* eret */
-    isb
     eret

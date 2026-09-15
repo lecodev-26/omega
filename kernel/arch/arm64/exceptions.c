@@ -42,8 +42,8 @@ void exception_handler_c(omega_exception_class_t class,
         g_irq_count++;
 
         if (irq == TIMER_IRQ) {
-            timer_irq_handler();      /* rearmar el timer */
-            task_tick_from_irq();     /* decidir cambio de tarea */
+            timer_irq_handler();
+            task_tick_from_irq_diag2();   /* decidir cambio de tarea */
         }
         gic_eoi(irq & 0x3FF);
         return;

@@ -4,30 +4,35 @@
  */
 
 #include <stddef.h>
+#include <stdint.h>
 #include "omega/task.h"
+#include "omega/uart.h"
 #include "omega/ipc.h"
 #include "omega/cap.h"
-#include "omega/uart.h"
 
 extern void context_switch(task_context_t *from, task_context_t *to);
 extern void task_start_first(task_context_t *to);
 extern void task_trampoline(void);
-extern void task_trampoline_irq(void);
 
-static task_t g_tasks[MAX_TASKS] __attribute__((aligned(16)));
+static task_t g_tasks[MAX_TASKS];
 static int    g_num_tasks = 0;
-static int    g_current = -1;
+static int    g_current   = -1;
+
+int g_preempt_from_idx = -1;
+int g_preempt_next_idx = -1;
 
 void task_init(void) {
-    for (int i = 0; i < MAX_TASKS; i++) {
-        g_tasks[i].idx = (uint64_t)i;
-        g_tasks[i].state = TASK_STATE_UNUSED;
-        g_tasks[i].yields = 0;
-        g_tasks[i].irqs = 0;
-        g_tasks[i].name[0] = '\0';
-    }
     g_num_tasks = 0;
     g_current = -1;
+    g_preempt_from_idx = -1;
+    g_preempt_next_idx = -1;
+
+    for (int i = 0; i < MAX_TASKS; i++) {
+        g_tasks[i].state = TASK_STATE_UNUSED;
+        g_tasks[i].idx = (uint64_t)i;
+        g_tasks[i].yields = 0;
+        g_tasks[i].irqs = 0;
+    }
 }
 
 int task_create(const char *name, void (*entry)(void)) {
@@ -50,24 +55,41 @@ int task_create(const char *name, void (*entry)(void)) {
     t->yields = 0;
     t->irqs = 0;
 
-    /* Limpiar todos los registros */
     for (int j = 0; j < 31; j++) {
         t->context.x[j] = 0;
     }
 
-    /* SP al tope del stack, alineado a 16 */
     uintptr_t sp_top = (uintptr_t)(t->stack + TASK_STACK_SIZE);
     sp_top &= ~((uintptr_t)0xF);
     t->context.sp = sp_top;
 
-    /* PC: por ahora usamos el trampoline cooperativo */
     t->context.pc = (uint64_t)task_trampoline;
 
-    /* SPSR: EL1h, DAIF enmascarado (interrupciones deshabilitadas) */
-    t->context.spsr = 0x5 | (0x3 << 6);
+    /*
+     * SPSR: EL1h (0x5) + DAIF con I=0 (IRQs habilitadas).
+     *
+     *   0x305 = 0b11_0000_0101:
+     *     bits [3:0] = 0101 → EL1h (SP_EL1)
+     *     bit  [4]   = 0    → AArch64
+     *     bits [9:6] = 1100 → D=1, A=1, I=0, F=0
+     *
+     * Esto es CRÍTICO: si I=1, la tarea arranca con IRQs
+     * enmascaradas y el timer nunca interrumpe.
+     */
+    t->context.spsr = 0x305;
 
-    /* x19 lleva el puntero a la task (usado por el trampoline) */
     t->context.x[19] = (uint64_t)t;
+
+    /*
+     * Preparar el stack de la tarea como si hubiera sido interrumpida:
+     * escribir x0-x30 en el marco de 256 bytes.
+     */
+    uintptr_t frame_sp = sp_top - 256;
+    uint64_t *frame = (uint64_t *)frame_sp;
+    for (int j = 0; j < 31; j++) {
+        frame[j] = 0;
+    }
+    frame[19] = (uint64_t)t;
 
     ipc_register_endpoint((uint32_t)idx);
     cap_table_init((uint32_t)idx);
@@ -81,24 +103,35 @@ void task_entry_point(task_t *t) {
     }
 }
 
+void task_entry_point_diag(task_t *t) {
+    uart_puts("[tep:");
+    uart_puthex64((uint64_t)t);
+    uart_puts("]");
+    if (t && t->entry) {
+        t->entry();
+    }
+}
+
 void task_finished(void) {
     if (g_current >= 0) {
         g_tasks[g_current].state = TASK_STATE_FINISHED;
     }
+    task_yield();
     for (;;) {
-        task_yield();
+        __asm__ volatile("wfe");
     }
 }
 
 int task_schedule_next(void) {
     if (g_num_tasks == 0) return -1;
+    if (g_num_tasks == 1) return 0;
 
     int start = (g_current + 1) % g_num_tasks;
     int idx = start;
+
     do {
         if (g_tasks[idx].state == TASK_STATE_READY ||
             g_tasks[idx].state == TASK_STATE_RUNNING) {
-            g_current = idx;
             return idx;
         }
         idx = (idx + 1) % g_num_tasks;
@@ -121,7 +154,6 @@ void task_yield(void) {
     }
 
     if (prev < 0) {
-        /* Primera llamada: arrancar directamente la siguiente tarea */
         g_tasks[next].state = TASK_STATE_RUNNING;
         g_tasks[next].yields++;
         task_start_first(&g_tasks[next].context);
@@ -141,7 +173,7 @@ int task_count(void) {
 }
 
 task_t *task_current(void) {
-    if (g_current < 0) return NULL;
+    if (g_current < 0 || g_current >= g_num_tasks) return NULL;
     return &g_tasks[g_current];
 }
 
@@ -150,29 +182,28 @@ task_t *task_get(int idx) {
     return &g_tasks[idx];
 }
 
-/* ============================================================
- * Preemption
- * ============================================================ */
+task_context_t *task_context_of(int idx) {
+    if (idx < 0 || idx >= g_num_tasks) return NULL;
+    return &g_tasks[idx].context;
+}
 
-int g_preempt_next_idx = -1;
+void task_set_current(int idx) {
+    g_current = idx;
+}
 
-/*
- * Llamado desde el handler de IRQ.
- * Decide si cambiar de tarea. NO hace el cambio directamente.
- * Actualiza g_preempt_next_idx con el índice de la nueva tarea.
- */
 void task_tick_from_irq(void) {
     if (g_num_tasks == 0) {
+        g_preempt_from_idx = -1;
         g_preempt_next_idx = -1;
         return;
     }
 
-    /* Incrementar el contador de IRQs de la tarea actual */
+    g_preempt_from_idx = g_current;
+
     if (g_current >= 0) {
         g_tasks[g_current].irqs++;
     }
 
-    /* Round-robin: elegir la siguiente tarea */
     int prev = g_current;
     int start = (g_current + 1) % g_num_tasks;
     int idx = start;
@@ -192,24 +223,42 @@ void task_tick_from_irq(void) {
         return;
     }
 
-    /* Actualizar estados */
     if (prev >= 0) {
         g_tasks[prev].state = TASK_STATE_READY;
     }
     g_tasks[next].state = TASK_STATE_RUNNING;
-
-    /* Actualizar g_current ANTES de retornar al assembly */
     g_current = next;
-
-    /* Indicar al assembly que hay que cambiar de tarea */
     g_preempt_next_idx = next;
 }
 
-task_context_t *task_context_of(int idx) {
-    if (idx < 0 || idx >= g_num_tasks) return NULL;
-    return &g_tasks[idx].context;
+void task_tick_from_irq_diag(void) {
+    uart_puts("[tick]");
+    task_tick_from_irq();
+    if (g_preempt_next_idx >= 0) {
+        uart_puts("[will switch to ");
+        uart_putdec32((uint32_t)g_preempt_next_idx);
+        uart_puts("]");
+    } else {
+        uart_puts("[no switch]");
+    }
 }
 
-void task_set_current(int idx) {
-    g_current = idx;
+void task_tick_from_irq_diag2(void) {
+    uart_puts("[tick]");
+    task_tick_from_irq();
+    if (g_preempt_next_idx >= 0) {
+        uart_puts("[will switch to ");
+        uart_putdec32((uint32_t)g_preempt_next_idx);
+        uart_puts("]");
+        task_t *t = &g_tasks[g_preempt_next_idx];
+        uart_puts("[pc=");
+        uart_puthex64(t->context.pc);
+        uart_puts(" sp=");
+        uart_puthex64(t->context.sp);
+        uart_puts(" spsr=");
+        uart_puthex64(t->context.spsr);
+        uart_puts("]");
+    } else {
+        uart_puts("[no switch]");
+    }
 }
