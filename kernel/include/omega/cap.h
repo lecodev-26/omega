@@ -48,6 +48,13 @@ void cap_table_init(uint32_t task_idx);
 int cap_add(capability_t *cap);
 
 /*
+ * Añade una capability a la tabla de la tarea indicada.
+ * Función interna del kernel. Se usa durante la inicialización
+ * del sistema para conceder capabilities a tareas específicas.
+ */
+int cap_add_to(uint32_t task_idx, capability_t *cap);
+
+/*
  * Busca una capability en la tabla de la tarea actual que designe
  * el objeto dado con al menos los derechos pedidos.
  * Devuelve el índice o -1 si no la encuentra.
@@ -70,10 +77,10 @@ void cap_revoke(int idx);
  */
 int cap_count(void);
 
-#endif /* OMEGA_CAP_H */
-
 /*
  * Devuelve un puntero a la capability en la tabla de la tarea actual.
  * Devuelve NULL si el índice no es válido.
  */
 capability_t *cap_get(int idx);
+
+#endif /* OMEGA_CAP_H */

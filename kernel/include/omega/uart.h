@@ -15,13 +15,13 @@ void uart_puthex64(uint64_t v);
 void uart_putdec32(uint32_t v);
 
 /*
- * Spinlock de la UART.
+ * uart_lock/uart_unlock:
  *
- * Protege la salida cuando varias tareas (o el handler de IRQ)
- * escriben a la UART a la vez. En un solo CPU, un simple
- * flag con instrucciones atómicas basta.
+ * En un sistema uniprocesador, basta con deshabilitar IRQs
+ * mientras se imprime. Guardamos el estado de DAIF para restaurarlo
+ * después. No hay spinlock: no hay otro CPU que compita.
  */
-void uart_lock(void);
-void uart_unlock(void);
+uint64_t uart_lock(void);
+void uart_unlock(uint64_t saved_daif);
 
 #endif /* OMEGA_UART_H */

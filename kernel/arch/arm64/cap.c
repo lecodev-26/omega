@@ -11,7 +11,7 @@
 
 typedef struct {
     capability_t caps[CAP_MAX_PER_TASK];
-    int          count;      /* número de capabilities válidas */
+    int          count;
 } cap_table_t;
 
 static cap_table_t g_cap_tables[MAX_TASKS_FOR_CAP] __attribute__((aligned(16)));
@@ -35,9 +35,6 @@ void cap_table_init(uint32_t task_idx) {
     }
 }
 
-/*
- * Encuentra el primer índice libre en la tabla dada.
- */
 static int cap_find_free(cap_table_t *tbl) {
     for (int i = 0; i < CAP_MAX_PER_TASK; i++) {
         if (!tbl->caps[i].valid) return i;
@@ -48,11 +45,19 @@ static int cap_find_free(cap_table_t *tbl) {
 int cap_add(capability_t *cap) {
     task_t *current = task_current();
     if (current == NULL) return -1;
+    return cap_add_to((uint32_t)current->idx, cap);
+}
 
-    uint32_t idx = (uint32_t)current->idx;
-    if (idx >= MAX_TASKS_FOR_CAP) return -1;
+/*
+ * Añade una capability a la tabla de la tarea indicada.
+ * Función interna del kernel. No valida autoridad: se usa durante
+ * la inicialización del sistema.
+ */
+int cap_add_to(uint32_t task_idx, capability_t *cap) {
+    if (task_idx >= MAX_TASKS_FOR_CAP) return -1;
+    if (cap == NULL) return -1;
 
-    cap_table_t *tbl = &g_cap_tables[idx];
+    cap_table_t *tbl = &g_cap_tables[task_idx];
     int free_idx = cap_find_free(tbl);
     if (free_idx < 0) return -1;
 
@@ -94,7 +99,6 @@ int cap_derive(int parent_idx, uint64_t subset_rights) {
     capability_t *parent = &tbl->caps[parent_idx];
     if (!parent->valid) return -1;
 
-    /* La hija no puede tener más derechos que la madre */
     if ((subset_rights & ~parent->rights) != 0) return -1;
 
     int free_idx = cap_find_free(tbl);

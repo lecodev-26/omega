@@ -64,11 +64,10 @@ int task_create(const char *name, void (*entry)(void)) {
     t->context.sp = sp_top;
 
     t->context.pc = (uint64_t)task_trampoline;
-    t->context.spsr = 0x305;   /* EL1h, DAIF.I=0 */
+    t->context.spsr = 0x305;
 
     t->context.x[19] = (uint64_t)t;
 
-    /* Preparar el stack de la tarea como si hubiera sido interrumpida */
     uintptr_t frame_sp = sp_top - 256;
     uint64_t *frame = (uint64_t *)frame_sp;
     for (int j = 0; j < 31; j++) {
@@ -101,7 +100,6 @@ void task_finished(void) {
 int task_schedule_next(void) {
     if (g_num_tasks == 0) return -1;
     if (g_num_tasks == 1) {
-        /* Solo una tarea: si está RUNNING o READY, devolverla. */
         if (g_tasks[0].state == TASK_STATE_RUNNING ||
             g_tasks[0].state == TASK_STATE_READY) {
             return 0;
@@ -130,7 +128,6 @@ void task_yield(void) {
     int next = task_schedule_next();
 
     if (next < 0) {
-        /* No hay otra tarea. Si la actual está BLOCKED, es un deadlock. */
         if (prev >= 0 && g_tasks[prev].state == TASK_STATE_BLOCKED) {
             uart_puts("[deadlock: no hay tareas listas]\n");
             for (;;) {
@@ -146,11 +143,27 @@ void task_yield(void) {
     }
 
     if (prev < 0) {
+        /* Primer arranque: sin deshabilitar IRQs */
+        g_current = next;
         g_tasks[next].state = TASK_STATE_RUNNING;
         g_tasks[next].yields++;
         task_start_first(&g_tasks[next].context);
         return;
     }
+
+    /*
+     * Cambio cooperativo.
+     *
+     * Deshabilitamos IRQs durante el cambio de contexto para que el
+     * timer no pueda interrumpir en medio. Esto evita deadlocks por
+     * doble bloqueo.
+     *
+     * Al retornar (esta tarea ha sido reanudada por otra), restauramos
+     * el estado de IRQs.
+     */
+    uint64_t daif;
+    __asm__ volatile("mrs %0, daif" : "=r"(daif));
+    __asm__ volatile("msr daifset, #2" ::: "memory");
 
     if (g_tasks[prev].state == TASK_STATE_RUNNING) {
         g_tasks[prev].state = TASK_STATE_READY;
@@ -159,7 +172,10 @@ void task_yield(void) {
     g_tasks[next].state = TASK_STATE_RUNNING;
     g_tasks[next].yields++;
 
+    g_current = next;
     context_switch(&g_tasks[prev].context, &g_tasks[next].context);
+
+    __asm__ volatile("msr daif, %0" :: "r"(daif) : "memory");
 }
 
 int task_count(void) {
@@ -185,28 +201,15 @@ void task_set_current(int idx) {
     g_current = idx;
 }
 
-/*
- * Bloquea la tarea actual y cede el control.
- *
- * Retorna cuando la tarea es desbloqueada por otra.
- */
 void task_block_current(void) {
     if (g_current < 0) return;
     g_tasks[g_current].state = TASK_STATE_BLOCKED;
     task_yield();
-
-    /*
-     * Al retornar, la tarea ha sido desbloqueada (estado READY o RUNNING).
-     * Si el scheduler la volvió a elegir, su estado será RUNNING.
-     */
     if (g_current >= 0 && g_tasks[g_current].state == TASK_STATE_READY) {
         g_tasks[g_current].state = TASK_STATE_RUNNING;
     }
 }
 
-/*
- * Desbloquea la tarea con el índice dado (si está BLOCKED).
- */
 void task_unblock(int idx) {
     if (idx < 0 || idx >= g_num_tasks) return;
     if (g_tasks[idx].state == TASK_STATE_BLOCKED) {

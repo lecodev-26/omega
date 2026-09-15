@@ -1,12 +1,17 @@
 /*
  * OMEGA — Kernel
  * ipc.c — Comunicación entre tareas (con capabilities y blocking)
+ *
+ * Las colas de los endpoints están protegidas por secciones críticas
+ * con IRQs deshabilitadas. Esto evita que el timer interrumpa en
+ * medio de un envío/recepción y cause deadlock.
  */
 
 #include <stddef.h>
 #include "omega/ipc.h"
 #include "omega/task.h"
 #include "omega/cap.h"
+#include "omega/uart.h"
 
 typedef struct {
     ipc_message_t messages[IPC_QUEUE_SIZE];
@@ -36,31 +41,20 @@ void ipc_register_endpoint(uint32_t idx) {
 }
 
 /*
- * Busca la primera tarea BLOCKED que esté esperando para recibir del
- * endpoint dado. Devuelve su índice o -1.
- *
- * Limitación: no distingue entre tareas bloqueadas por send vs recv.
- * El endpoint solo tiene una "cola de espera" lógica; como las tareas
- * bloqueadas por send esperan hueco y las bloqueadas por recv esperan
- * mensaje, en la práctica se despiertan en el orden correcto porque
- * los desbloqueos se hacen en el punto adecuado.
+ * Despierta a la primera tarea BLOCKED (si hay alguna).
+ * Llamado dentro de una sección crítica (IRQs off).
  */
-static int ipc_find_blocked_receiver(uint32_t endpoint) {
-    (void)endpoint;
-    for (int i = 0; i < task_count(); i++) {
+static void ipc_wake_one_blocked(void) {
+    int n = task_count();
+    for (int i = 0; i < n; i++) {
         task_t *t = task_get(i);
         if (t && t->state == TASK_STATE_BLOCKED) {
-            return i;
+            task_unblock(i);
+            return;
         }
     }
-    return -1;
 }
 
-/*
- * Envía un mensaje SIN capability adjunta.
- *
- * Si el buzón está lleno, bloquea la tarea actual hasta que haya hueco.
- */
 int ipc_send(uint32_t target_endpoint, const ipc_message_t *msg) {
     if (target_endpoint >= IPC_MAX_ENDPOINTS) return -1;
     if (msg == NULL) return -1;
@@ -72,31 +66,25 @@ int ipc_send(uint32_t target_endpoint, const ipc_message_t *msg) {
     ipc_endpoint_t *ep = &g_endpoints[target_endpoint];
     if (!ep->valid) return -1;
 
-    /* Si el buzón está lleno, bloquear hasta que haya hueco */
-    while (ep->count >= IPC_QUEUE_SIZE) {
+    while (1) {
+        uint64_t daif = uart_lock();
+
+        if (ep->count < IPC_QUEUE_SIZE) {
+            ep->messages[ep->tail] = *msg;
+            ep->messages[ep->tail].has_cap = 0;
+            ep->tail = (ep->tail + 1) % IPC_QUEUE_SIZE;
+            ep->count++;
+
+            ipc_wake_one_blocked();
+            uart_unlock(daif);
+            return 0;
+        }
+
+        uart_unlock(daif);
         task_block_current();
-        /* Al despertar, reintentar */
     }
-
-    ep->messages[ep->tail] = *msg;
-    ep->messages[ep->tail].has_cap = 0;
-    ep->tail = (ep->tail + 1) % IPC_QUEUE_SIZE;
-    ep->count++;
-
-    /* Despertar a un receptor bloqueado (si lo hay) */
-    int recv_idx = ipc_find_blocked_receiver(target_endpoint);
-    if (recv_idx >= 0) {
-        task_unblock(recv_idx);
-    }
-
-    return 0;
 }
 
-/*
- * Envía un mensaje CON capability adjunta.
- *
- * Si el buzón está lleno, bloquea la tarea actual hasta que haya hueco.
- */
 int ipc_send_with_cap(uint32_t target_endpoint,
                       const ipc_message_t *msg,
                       int sender_cap_idx) {
@@ -114,34 +102,30 @@ int ipc_send_with_cap(uint32_t target_endpoint,
     ipc_endpoint_t *ep = &g_endpoints[target_endpoint];
     if (!ep->valid) return -1;
 
-    while (ep->count >= IPC_QUEUE_SIZE) {
+    while (1) {
+        uint64_t daif = uart_lock();
+
+        if (ep->count < IPC_QUEUE_SIZE) {
+            ipc_message_t out_msg = *msg;
+            out_msg.has_cap = 1;
+            out_msg.attached_cap = *src_cap;
+            out_msg.attached_cap.rights = src_cap->rights & ~CAP_RIGHT_GRANT;
+            out_msg.attached_cap.valid = 1;
+
+            ep->messages[ep->tail] = out_msg;
+            ep->tail = (ep->tail + 1) % IPC_QUEUE_SIZE;
+            ep->count++;
+
+            ipc_wake_one_blocked();
+            uart_unlock(daif);
+            return 0;
+        }
+
+        uart_unlock(daif);
         task_block_current();
     }
-
-    ipc_message_t out_msg = *msg;
-    out_msg.has_cap = 1;
-    out_msg.attached_cap = *src_cap;
-    out_msg.attached_cap.rights = src_cap->rights & ~CAP_RIGHT_GRANT;
-    out_msg.attached_cap.valid = 1;
-
-    ep->messages[ep->tail] = out_msg;
-    ep->tail = (ep->tail + 1) % IPC_QUEUE_SIZE;
-    ep->count++;
-
-    int recv_idx = ipc_find_blocked_receiver(target_endpoint);
-    if (recv_idx >= 0) {
-        task_unblock(recv_idx);
-    }
-
-    return 0;
 }
 
-/*
- * Recibe un mensaje del endpoint de la tarea actual.
- *
- * Si el buzón está vacío, bloquea la tarea actual hasta que llegue
- * un mensaje.
- */
 int ipc_recv(ipc_message_t *out) {
     if (out == NULL) return -1;
 
@@ -154,39 +138,32 @@ int ipc_recv(ipc_message_t *out) {
     ipc_endpoint_t *ep = &g_endpoints[idx];
     if (!ep->valid) return -1;
 
-    while (ep->count == 0) {
+    while (1) {
+        uint64_t daif = uart_lock();
+
+        if (ep->count > 0) {
+            *out = ep->messages[ep->head];
+            ep->head = (ep->head + 1) % IPC_QUEUE_SIZE;
+            ep->count--;
+
+            if (out->has_cap) {
+                capability_t new_cap = out->attached_cap;
+                new_cap.generation = 0;
+                new_cap.valid = 1;
+                int idx_cap = cap_add(&new_cap);
+                if (idx_cap < 0) {
+                    out->has_cap = 0;
+                }
+            }
+
+            ipc_wake_one_blocked();
+            uart_unlock(daif);
+            return 0;
+        }
+
+        uart_unlock(daif);
         task_block_current();
     }
-
-    *out = ep->messages[ep->head];
-    ep->head = (ep->head + 1) % IPC_QUEUE_SIZE;
-    ep->count--;
-
-    /*
-     * Si el mensaje lleva capability adjunta, añadirla a la tabla del receptor.
-     */
-    if (out->has_cap) {
-        capability_t new_cap = out->attached_cap;
-        new_cap.generation = 0;
-        new_cap.valid = 1;
-        int idx_cap = cap_add(&new_cap);
-        if (idx_cap < 0) {
-            out->has_cap = 0;
-        }
-    }
-
-    /*
-     * Despertar a un emisor bloqueado (si lo hay): hay hueco libre.
-     */
-    for (int i = 0; i < task_count(); i++) {
-        task_t *t = task_get(i);
-        if (t && t->state == TASK_STATE_BLOCKED) {
-            task_unblock(i);
-            break;
-        }
-    }
-
-    return 0;
 }
 
 int ipc_pending(uint32_t endpoint) {
