@@ -21,7 +21,8 @@ C_SRCS   := kmain.c \
             arch/arm64/gic.c \
             arch/arm64/task.c \
             arch/arm64/ipc.c \
-            arch/arm64/cap.c
+            arch/arm64/cap.c \
+            arch/arm64/mmu.c
 
 ASM_OBJS := $(patsubst %.S,$(BUILD_DIR)/%.o,$(ASM_SRCS))
 C_OBJS   := $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SRCS))

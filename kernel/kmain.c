@@ -74,6 +74,20 @@ void kmain(void) {
     uart_puts("OMEGA kernel v12 (IPC blocking test)\n");
     uart_puts("---\n");
 
+    /* Verificar estado de la MMU */
+    {
+        uint64_t sctlr;
+        __asm__ volatile("mrs %0, sctlr_el1" : "=r"(sctlr));
+        uart_puts("SCTLR_EL1 = ");
+        uart_puthex64(sctlr);
+        uart_puts("\n");
+        if (sctlr & 1) {
+            uart_puts("MMU: HABILITADA\n");
+        } else {
+            uart_puts("MMU: DESHABILITADA\n");
+        }
+    }
+
     uart_puts("Inicializando excepciones...\n");
     exceptions_init();
     uart_puts("Vector table instalada.\n");
