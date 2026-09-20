@@ -17,16 +17,13 @@ Sin embargo, la implementación concreta todavía no está decidida.
 
 ### Opción A — OMEGA sobre/adaptado a seL4
 
-- **Ventaja:** seL4 está verificado formalmente. Proporciona IPC, capabilities,
-  scheduling.
-- **Desventaja:** seL4 es un microkernel ya existente; OMEGA sería una capa
-  encima. La arquitectura propia quedaría limitada.
+- **Ventaja:** seL4 está verificado formalmente. Proporciona IPC, capabilities, scheduling.
+- **Desventaja:** seL4 es un microkernel ya existente; OMEGA sería una capa encima.
 
 ### Opción B — Microkernel propio desde cero
 
 - **Ventaja:** Control total sobre la arquitectura.
-- **Desventaja:** Muy costoso. Requiere años de trabajo. Riesgo de no llegar
-  a un sistema funcional.
+- **Desventaja:** Muy costoso. Requiere años de trabajo.
 
 ### Opción C — Otra base experimental
 
@@ -46,15 +43,11 @@ Sin embargo, la implementación concreta todavía no está decidida.
 
 ## Decisión
 
-**Pendiente.** No se decide ahora.
+**Reemplazado por ADR-0002.**
 
-Se construirá primero un **prototipo host** que permita explorar conceptos
-(IPC, capabilities, servicios) sin depender de hardware ni de kernel real.
-
-La decisión sobre la base del kernel real se tomará cuando:
-1. Exista el prototipo host.
-2. Exista hardware disponible.
-3. Se haya experimentado con el Piloto 1.
+El proyecto avanzó con la **Opción D**: primero un prototipo host, luego
+un kernel prototype en QEMU, y finalmente la decisión arquitectónica real
+se tomará con más información.
 
 ## Consecuencias
 
@@ -64,10 +57,10 @@ La decisión sobre la base del kernel real se tomará cuando:
 
 ## Estado
 
-**Propuesto.**
+**Reemplazado.** Ver ADR-0002, ADR-0003, ADR-0004, ADR-0005.
 
 ## Referencias
 
 - `docs/vision/` — Fases 0.1.0–0.1.18
-- `docs/architecture/` — Especificación pendiente
+- `docs/decisions/ADR-0002-kernel-prototype.md` — Kernel prototype
 - `ROADMAP.md` — Milestones

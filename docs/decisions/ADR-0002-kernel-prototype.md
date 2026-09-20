@@ -3,28 +3,27 @@
 ## Contexto
 
 En el Bloque 12 se creó `kernel/` como directorio del prototipo del kernel
-OMEGA. Durante los Bloques 13 y 14 se añadieron multitarea cooperativa y
-IPC básico. Este ADR documenta las decisiones arquitectónicas tomadas en
-el prototipo y sus justificaciones.
+OMEGA. Durante los Bloques 13–23 se añadieron multitarea cooperativa,
+preemption, IPC blocking, capabilities y paso de capabilities.
+
+Este ADR documenta las decisiones arquitectónicas tomadas en el prototipo.
 
 ## Decisiones tomadas
 
 ### 1. Target: aarch64-unknown-none (bare-metal)
 
-**Decisión:** El kernel se compila para `aarch64-unknown-none`, sin
-dependencia de ningún sistema operativo subyacente.
+**Decisión:** El kernel se compila para `aarch64-unknown-none`.
 
 **Justificación:** Coherente con el objetivo de OMEGA de ser un sistema
 operativo propio. Se ejecuta directamente sobre QEMU virt.
 
 ### 2. Toolchain: clang + ld.lld + llvm-objcopy
 
-**Decisión:** Usar LLVM (clang como compilador, ld.lld como linker,
-llvm-objcopy para generar el binario raw).
+**Decisión:** Usar LLVM.
 
 **Justificación:** Clang en Termux soporta el target `aarch64-unknown-none`.
-`ld.lld` se invoca directamente (no mediante clang) porque clang en Termux
-tiene problemas invocando el linker para targets bare-metal.
+`ld.lld` se invoca directamente porque clang tiene problemas para invocar
+el linker en targets bare-metal.
 
 **Ver:** `docs/development/README.md` — Regla sobre linker bare-metal.
 
@@ -32,77 +31,87 @@ tiene problemas invocando el linker para targets bare-metal.
 
 **Decisión:** Compilar con `-mgeneral-regs-only`.
 
-**Justificación:** En bare-metal aarch64, el acceso a registros FP/SIMD
-está deshabilitado por defecto (via `CPACR_EL1.FPEN`). El compilador no
-lo sabe y puede generar instrucciones SIMD que causan excepciones
-irrecuperables.
-
-**Ver:** `docs/development/README.md` — Regla sobre FP/SIMD.
+**Justificación:** En bare-metal aarch64, FP/SIMD está deshabilitado por
+defecto. El compilador puede generar instrucciones SIMD que causan
+excepciones irrecuperables.
 
 ### 4. Alineación de structs a 8/16 bytes
 
-**Decisión:** Toda struct accesible por el compilador con instrucciones
-de 8 bytes debe estar alineada adecuadamente (`__attribute__((aligned(8)))`
-o `aligned(16)`).
+**Decisión:** Toda struct accesible con instrucciones de 8 bytes debe
+estar alineada (`__attribute__((aligned(8)))` o `aligned(16)`).
 
-**Justificación:** Sin MMU, en bare-metal aarch64, los accesos no alineados
-a la instrucción generan Alignment fault. El compilador puede generar
-`stur x8` o `stp` que requieren alineación.
+**Justificación:** Sin MMU, los accesos no alineados generan Alignment fault.
 
-**Ver:** `docs/development/README.md` — Regla sobre alineación.
+### 5. Multitarea preemptiva (supera la cooperativa)
 
-### 5. Multitarea cooperativa (no preemptiva todavía)
+**Decisión:** El scheduler es preemptivo con timer a 100 ms. Las tareas
+también pueden ceder el control con `task_yield()`.
 
-**Decisión:** Las tareas ceden el control explícitamente con `task_yield()`.
+**Justificación:** La preemption es la base de un scheduler real. El
+cambio de contexto desde IRQ requiere contexto extendido.
 
-**Justificación:** El cambio de contexto cooperativo es más simple y no
-requiere modificar el handler de IRQ. La preemption con timer se deja
-para un bloque posterior.
+**Ver:** ADR-0004 — Preemption con timer.
 
-**Limitación:** Las tareas deben ser cooperativas. Una tarea que no ceda
-el control monopoliza la CPU.
+### 6. Contexto de tarea extendido
 
-### 6. Contexto de tarea: callee-saved solo
+**Decisión:** `task_context_t` guarda x0-x30 + SP + PC + SPSR.
 
-**Decisión:** El `task_context_t` guarda solo los registros callee-saved
-(x19-x28, x29/FP, x30/LR, SP, PC).
+**Justificación:** Es el contexto necesario para reanudar una tarea
+interrumpida por IRQ. El cambio cooperativo usa solo los callee-saved,
+pero el contexto extendido permite preemption.
 
-**Justificación:** Suficiente para el cambio de contexto cooperativo
-(llamada a función normal). La preemption requerirá guardar x0-x30 completo.
+**Ver:** `docs/development/README.md` — Regla sobre contexto extendido.
 
 ### 7. Trampoline por tarea
 
 **Decisión:** Toda tarea nueva arranca desde `task_trampoline`, que recibe
 el puntero a la task en x19 y llama a su entry point.
 
-**Justificación:** Permite inicializar uniformemente tareas nuevas. Si
-la tarea retorna, `task_finished()` la marca como terminada.
+**Justificación:** Permite inicializar uniformemente tareas nuevas.
 
-### 8. IPC básico (endpoints + mensajes)
+### 8. IPC blocking con capabilities
 
-**Decisión:** El IPC usa endpoints identificados por índice (0..MAX_TASKS-1)
-y mensajes con payload de 64 bytes.
+**Decisión:** El IPC usa endpoints identificados por índice, con colas
+FIFO de 16 mensajes de 64 bytes de payload. `send`/`recv` bloquean si
+el buzón está lleno/vacío. El acceso a endpoints está mediado por
+capabilities.
 
-**Justificación:** Modelo simple que valida el mecanismo. No hay
-capabilities todavía (acceso por número de endpoint). No hay blocking.
+**Justificación:** IPC real, no polling. Control de acceso real.
 
-**Limitación:** No hay control de acceso. Cualquier tarea puede enviar
-a cualquier endpoint.
+**Ver:** ADR-0005 — IPC blocking.
+
+### 9. Capabilities y paso de capabilities
+
+**Decisión:** Cada tarea tiene una tabla de 16 capabilities. Las
+capabilities designan endpoints con derechos (`READ`, `WRITE`, `GRANT`,
+`REVOKE`). El paso de capabilities en mensajes sigue el principio de
+no incremento de derechos.
+
+**Ver:** `docs/development/README.md` — Regla sobre capabilities.
+
+### 10. Sincronización con `daif` save/restore
+
+**Decisión:** En lugar de spinlocks, el kernel deshabilita IRQs en
+secciones críticas (UART, IPC, `task_yield`). En un sistema uniprocesador,
+es suficiente.
+
+**Justificación:** Evita deadlocks por reentrada.
+
+**Ver:** ADR-0005 — IPC blocking.
 
 ## Consecuencias
 
-- El kernel prototype es funcional pero limitado.
-- Cada decisión tiene una limitación conocida y una mejora futura.
+- El kernel prototype es funcional en QEMU virt aarch64.
+- Cada decisión tiene una limitación conocida.
 - La arquitectura conceptual (0.1.x) sigue siendo la referencia a largo
   plazo, pero el prototype es un subconjunto simplificado.
 
 ## Estado
 
-**Aceptado.**
+**Aceptado.** Parcialmente superado por ADR-0003, ADR-0004, ADR-0005.
 
 ## Pendientes para próximos ADRs
 
-- ADR-XXXX: Modelo de preemption (cuando se implemente).
-- ADR-XXXX: Modelo de capabilities (cuando se implemente).
 - ADR-XXXX: Modelo de MMU (cuando se implemente).
 - ADR-XXXX: Modelo de user space (cuando se implemente).
+- ADR-XXXX: Modelo de drivers (cuando se implemente).

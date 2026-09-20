@@ -7,15 +7,30 @@ para construir un sistema operativo de nueva generación.
 
 ## Estado
 
-**Fase actual:** Construcción inicial del repositorio.
+**Fase actual:** Prototipo funcional en QEMU. Consolidación documental.
+
+**Existe:**
+
+- Kernel prototype funcional en QEMU virt aarch64.
+- Boot bare-metal, UART, excepciones, timer, GIC.
+- Multitarea preemptiva con timer.
+- IPC blocking con capabilities.
+- Paso de capabilities en mensajes IPC.
+- Host prototype v3 (banco de pruebas en user space).
+- Simulación host del Piloto 1 IPC.
 
 **No existe todavía:**
 
-- Kernel funcional
-- Sistema operativo ejecutable
-- Imagen arrancable
-- Benchmark ejecutado
-- Resultados experimentales
+- Kernel en hardware real.
+- MMU / memoria virtual.
+- User space (EL0).
+- Drivers más allá de UART, GIC, timer.
+- Sistema de archivos.
+- Red.
+- Resultados experimentales en hardware.
+
+**El kernel prototype corre únicamente en QEMU virt aarch64.**
+**No se afirma que funcione en hardware real.**
 
 ## Visión
 
@@ -45,6 +60,7 @@ futuras pueden cambiar si la evidencia experimental o técnica lo exige.
 - [Experimentos](docs/experiments/)
 - [Decisiones (ADR)](docs/decisions/)
 - [Desarrollo](docs/development/)
+- [Hardware](docs/hardware/)
 
 ## Roadmap
 

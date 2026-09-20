@@ -233,8 +233,8 @@ Limitaciones:
 
 ## Regla sobre contexto extendido de tareas
 
-El `task_context_t` extendido contiene x0-x30 + SP + PC + SPSR. Este es
-el contexto necesario para reanudar una tarea interrumpida por IRQ.
+El `task_context_t` contiene x0-x30 + SP + PC + SPSR. Este es el contexto
+necesario para reanudar una tarea interrumpida por IRQ.
 
 **Layout (offsets en bytes):**
 - 0..240: x[0]..x[30] (31 registros de 8 bytes)
@@ -242,12 +242,196 @@ el contexto necesario para reanudar una tarea interrumpida por IRQ.
 - 256: pc (ELR_EL1)
 - 264: spsr
 
-**Uso cooperativo actual:** Solo se guardan/restauran los callee-saved
+**Uso cooperativo:** Solo se guardan/restauran los callee-saved
 (x19-x30) + SP + PC. El resto no se toca.
 
-**Uso preemptivo (preparado, no activado):** El stub de excepción
-guarda x0-x30 completo en el stack de la tarea. El cambio de contexto
-desde IRQ lee/escribe el contexto extendido completo.
+**Uso preemptivo (ACTIVADO):** El stub de excepción guarda x0-x30 completo
+en el stack de la tarea. El cambio de contexto desde IRQ
+(`context_switch_from_irq`) lee/escribe el contexto extendido completo.
 
-**Verificado:** el kernel prototype compila y funciona con el contexto
-extendido, manteniendo la multitarea cooperativa.
+**Verificado:** el kernel prototype compila y funciona con multitarea
+preemptiva en QEMU virt aarch64.
+
+## Regla sobre preemption con timer
+
+La preemption está ACTIVADA. El timer del sistema interrumpe cada 100 ms
+y fuerza el cambio de tarea.
+
+**Componentes:**
+
+- `timer_irq_handler()` rearma el timer.
+- `task_tick_from_irq()` decide la siguiente tarea. Actualiza
+  `g_preempt_from_idx` y `g_preempt_next_idx`.
+- El stub de IRQ, al retornar de C, verifica `g_preempt_next_idx`:
+  - Si `< 0`: retorno normal (restaurar x0-x30 del stack + `eret`).
+  - Si `>= 0`: llamar a `context_switch_from_irq(from, to)`.
+- `context_switch_from_irq` hace el cambio completo y `eret`.
+
+**Detalles críticos:**
+
+1. **`SPSR` de tareas nuevas debe ser `0x305`**, no `0x3C5`.
+   - `0x305` = `EL1h` + `D=1, A=1, I=0, F=0` (IRQs habilitadas).
+   - `0x3C5` = `EL1h` + `D=1, A=1, I=1, F=1` (IRQs enmascaradas).
+   - Si es `0x3C5`, la tarea arranca con IRQs deshabilitadas y el
+     timer nunca interrumpe.
+
+2. **El stack de tareas nuevas debe prepararse en `task_create`**
+   como si hubieran sido interrumpidas: escribir x0-x30 en el marco de
+   256 bytes, con `x19 = puntero a task`. Sin esto,
+   `context_switch_from_irq` carga basura en `x19` al cambiar a una
+   tarea nueva.
+
+3. **`task_tick_from_irq` solo debe llamarse UNA vez por tick.** Llamarla
+   dos veces hace que el scheduler cambie a B y vuelva a A inmediatamente.
+
+4. **`eret` no restaura SP.** Usa `SP_EL1` directamente. Por eso
+   `context_switch_from_irq` ajusta `sp` al SP original de la tarea
+   antes de `eret`.
+
+5. **Al cargar x0-x30 del stack a los registros, x2 y x3 se cargan al
+   final.** Porque x2, x3 se usan como temporales durante el proceso.
+
+**Ver:** `docs/decisions/ADR-0004-preemption-timer.md`.
+
+## Regla sobre IPC blocking
+
+`ipc_send` y `ipc_recv` bloquean si el buzón está lleno/vacío. La tarea
+se pone en estado BLOCKED y el scheduler elige otra.
+
+**Componentes:**
+
+- `TASK_STATE_BLOCKED` — estado de tarea bloqueada.
+- `task_block_current()` — bloquea la tarea actual y cede el control.
+- `task_unblock(idx)` — desbloquea la tarea `idx` (pone READY).
+- `ipc_send` — si el buzón está lleno, bloquea hasta que haya hueco.
+- `ipc_recv` — si el buzón está vacío, bloquea hasta que llegue mensaje.
+
+**Detalles críticos:**
+
+1. **Secciones críticas con IRQs deshabilitadas.** `ipc_send`/`ipc_recv`
+   acceden a las colas dentro de secciones críticas. Esto evita que el
+   timer interrumpa entre `ep->count++` y `task_unblock()`, lo cual
+   causaba deadlock.
+
+2. **`task_yield` es atómico.** Deshabilita IRQs alrededor del cambio
+   de contexto cooperativo. Evita que el timer interrumpa en medio.
+
+3. **Excepción en `task_yield` para el arranque inicial.** En `prev < 0`
+   (primera tarea), no se deshabilitan IRQs, porque la tarea nueva debe
+   arrancar con IRQs habilitadas.
+
+**Ver:** `docs/decisions/ADR-0005-ipc-blocking.md`.
+
+## Regla sobre `daif` save/restore
+
+En lugar de spinlocks, el kernel usa `daif` save/restore para
+sincronización. En un sistema uniprocesador, deshabilitar IRQs es
+suficiente.
+
+**Sintaxis:**
+
+```c
+uint64_t daif = uart_lock();   /* guarda DAIF, deshabilita IRQs */
+/* ... sección crítica ... */
+uart_unlock(daif);             /* restaura DAIF */
+```
+
+Uso actual:
+
+· UART: uart_puts, uart_puthex64, uart_putdec32.
+· IPC: ipc_send, ipc_recv, ipc_send_with_cap.
+· Scheduler: task_yield (alrededor de context_switch).
+
+Regla: nunca mantener el lock mientras se llama a task_block_current
+o a cualquier función que pueda bloquear. Deshabilitar IRQs, hacer la
+operación crítica, rehabilitar IRQs, y luego bloquear si es necesario.
+
+Verificado: resuelve deadlocks por reentrada y carreras con el timer.
+
+Regla sobre task_yield atómico
+
+task_yield no es reentrante y debe ser atómico respecto al timer.
+
+Problema: si el timer interrumpe a A justo después de que A ponga
+g_current = B pero antes de context_switch, el handler de IRQ ve
+g_current = B, y puede causar corrupción de contexto o deadlock.
+
+Solución: deshabilitar IRQs alrededor del cambio de contexto
+cooperativo.
+
+```c
+uint64_t daif;
+__asm__ volatile("mrs %0, daif" : "=r"(daif));
+__asm__ volatile("msr daifset, #2" ::: "memory");
+
+g_current = next;
+context_switch(&g_tasks[prev].context, &g_tasks[next].context);
+
+__asm__ volatile("msr daif, %0" :: "r"(daif) : "memory");
+```
+
+Excepción: en el arranque inicial (prev < 0), no se deshabilitan
+IRQs, porque la tarea nueva debe arrancar con IRQs habilitadas.
+
+Ver: docs/decisions/ADR-0005-ipc-blocking.md.
+
+Regla sobre g_current
+
+g_current es el índice de la tarea actualmente en ejecución. Debe
+actualizarse antes de cualquier cambio de contexto.
+
+Errores conocidos:
+
+1. En task_yield, cuando prev < 0 (arranque inicial), g_current
+   no se actualizaba. Resultado: task_current() devolvía NULL, y
+   cap_lookup fallaba, rompiendo el IPC.
+2. En task_yield, en el cambio cooperativo, g_current no se
+   actualizaba. Resultado: task_current() devolvía la tarea equivocada
+   cuando B arrancaba.
+
+Solución: actualizar g_current = next antes de task_start_first
+y antes de context_switch.
+
+Regla sobre el orden de las operaciones en IPC
+
+En ipc_send/ipc_recv, el orden correcto es:
+
+1. Comprobar si hay hueco/mensaje (con IRQs off).
+2. Si hay, escribir/leer y desbloquear (con IRQs off).
+3. Si no hay, rehabilitar IRQs y bloquear la tarea.
+
+Nunca bloquear la tarea con IRQs deshabilitadas. Si se hace, el
+timer no puede despertarla y hay deadlock.
+
+Ejemplo correcto:
+
+```c
+while (1) {
+    uint64_t daif = uart_lock();
+
+    if (ep->count < IPC_QUEUE_SIZE) {
+        ep->messages[ep->tail] = *msg;
+        ep->tail = (ep->tail + 1) % IPC_QUEUE_SIZE;
+        ep->count++;
+
+        ipc_wake_one_blocked();
+        uart_unlock(daif);
+        return 0;
+    }
+
+    uart_unlock(daif);
+    task_block_current();
+}
+```
+
+Ejemplo incorrecto (deadlock):
+
+```c
+uint64_t daif = uart_lock();
+while (ep->count >= IPC_QUEUE_SIZE) {
+    task_block_current();   /* ← IRQs deshabilitadas, timer no puede despertar */
+}
+/* ... */
+uart_unlock(daif);
+```
+

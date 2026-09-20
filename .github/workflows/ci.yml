@@ -32,6 +32,14 @@ jobs:
           test -d docs/development
           test -d docs/hardware
           echo "Estructura docs OK"
+      - name: Verificar ADRs
+        run: |
+          test -f docs/decisions/ADR-0001-kernel-foundation.md
+          test -f docs/decisions/ADR-0002-kernel-prototype.md
+          test -f docs/decisions/ADR-0003-scheduler.md
+          test -f docs/decisions/ADR-0004-preemption-timer.md
+          test -f docs/decisions/ADR-0005-ipc-blocking.md
+          echo "ADRs OK"
 
   host-build:
     name: Host prototype (build + test)
@@ -53,3 +61,23 @@ jobs:
         run: |
           test -f build/omega-host
           file build/omega-host
+
+  kernel-build:
+    name: Kernel prototype (build ARM64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar clang, lld, llvm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm make
+      - name: Compilar kernel bare-metal aarch64
+        working-directory: kernel
+        run: make CC=clang
+      - name: Verificar binarios
+        working-directory: kernel
+        run: |
+          test -f build/omega.elf
+          test -f build/omega.bin
+          file build/omega.elf
+          file build/omega.bin

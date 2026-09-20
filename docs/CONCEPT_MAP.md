@@ -43,6 +43,29 @@ y dónde está la documentación correspondiente.
 
 | ADR | Título | Estado |
 |-----|--------|--------|
-| ADR-0001 | Fundación del kernel | Propuesto |
-| ADR-0002 | Kernel prototype | Aceptado |
-| ADR-0003 | Scheduler | Parcialmente aceptado |
+| ADR-0001 | Fundación del kernel | Reemplazado |
+| ADR-0002 | Kernel prototype | Aceptado (parcialmente superado) |
+| ADR-0003 | Scheduler | Aceptado |
+| ADR-0004 | Preemption con timer | Aceptado |
+| ADR-0005 | IPC blocking | Aceptado |
+
+## Kernel prototype — estado por componente
+
+| Componente | Estado | Verificado |
+|-----------|--------|-----------|
+| Boot aarch64 | ✅ | QEMU virt |
+| UART PL011 | ✅ | QEMU virt |
+| Excepciones | ✅ | QEMU virt |
+| ARM Generic Timer | ✅ | QEMU virt |
+| GICv2 + IRQs reales | ✅ | QEMU virt |
+| Multitarea cooperativa | ✅ | QEMU virt |
+| Multitarea preemptiva | ✅ | QEMU virt |
+| IPC básico | ✅ | QEMU virt |
+| IPC blocking | ✅ | QEMU virt |
+| Capabilities | ✅ | QEMU virt |
+| Paso de caps en IPC | ✅ | QEMU virt |
+| MMU | ❌ | No iniciado |
+| User space (EL0) | ❌ | No iniciado |
+| Drivers (más) | ❌ | No iniciado |
+| Sistema de archivos | ❌ | No iniciado |
+| Red | ❌ | No iniciado |

@@ -22,17 +22,10 @@
 - **Diseño experimental (R2):** Congelado.
 - **Protocolo Piloto 1:** Cerrado como propuesta.
 
-## Reglas
-
-- Los documentos congelados no se modifican.
-- Nuevas decisiones se registran como ADR.
-- Toda afirmación factual debe tener fuente primaria.
-- Separar hechos, hipótesis, decisiones y preguntas abiertas.
-
 ## Estado del kernel prototype
 
 El kernel prototype OMEGA ha alcanzado el estado de **multitarea
-cooperativa con IPC y capabilities**.
+preemptiva con IPC blocking y capabilities**.
 
 ### Lo que funciona
 
@@ -42,31 +35,28 @@ cooperativa con IPC y capabilities**.
 - ARM Generic Timer.
 - GIC (GICv2).
 - IRQs reales del timer.
-- Multitarea cooperativa (2+ tareas con `task_yield`).
-- IPC entre tareas con colas FIFO.
+- Multitarea preemptiva (timer a 100 ms).
+- Multitarea cooperativa (`task_yield`).
+- IPC blocking (send/recv esperan si el buzón está lleno/vacío).
 - Capabilities (object capabilities) para endpoints.
 - Paso de capabilities en mensajes IPC.
-- Contexto extendido preparado para preemption.
+- Contexto extendido (x0-x30 + SP + PC + SPSR).
 
 ### Lo que NO funciona todavía
 
-- Preemption con timer (preparada, no activada).
 - MMU (sin memoria virtual).
 - User space (todo corre en EL1).
 - Drivers más allá de UART, GIC y timer.
 - Sistema de archivos.
 - Red.
-
-### Bloqueadores
-
-- Ninguno impide el avance del proyecto.
-- La preemption requiere más iteraciones de prueba/error.
-- La MMU y el user space requieren más trabajo arquitectónico.
+- SMP (un solo CPU).
 
 ### Documentación relacionada
 
 - `kernel/README.md` — Estado actual del kernel.
 - `kernel/arch/arm64/README.md` — Notas de arquitectura.
 - `docs/decisions/ADR-0002-kernel-prototype.md` — Decisiones de arquitectura.
-- `docs/decisions/ADR-0003-scheduler.md` — Decisiones de scheduler.
+- `docs/decisions/ADR-0003-scheduler.md` — Modelo de scheduler.
+- `docs/decisions/ADR-0004-preemption-timer.md` — Preemption con timer.
+- `docs/decisions/ADR-0005-ipc-blocking.md` — IPC blocking.
 - `docs/development/README.md` — Reglas del proyecto.
